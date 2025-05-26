@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# System files
+.DS_Store
+Thumbs.db
+
+# dotenv files
+.env
+
+# Local env files for client and server
+client/.env
+server/.env
+
+# Ignore coverage reports
+coverage/
+
+# Ignore editor config files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore OS generated files
+*.swp
+*.bak
+*.tmp
