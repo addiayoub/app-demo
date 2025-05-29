@@ -1,142 +1,41 @@
+// routes/auth.js
 const express = require('express');
 const passport = require('passport');
-const User = require('../models/User');
 const router = express.Router();
+const { isAuthenticated } = require('../middleware/auth');
+const authController = require('../controllers/authController');
 
-// Middleware pour vérifier l'authentification
-const isAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ message: 'Non authentifié' });
-};
+// Routes d'authentification
+router.post('/register', authController.register);
+router.post('/login', authController.login);
+router.post('/logout', authController.logout);
 
-// Inscription locale
-router.post('/register', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
+// Routes de vérification d'email
+router.get('/verify-email/:token', authController.verifyEmail);
+router.post('/resend-verification', authController.resendVerification);
 
-    // Vérifier si l'utilisateur existe déjà
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ 
-        message: 'Un utilisateur avec cet email existe déjà' 
-      });
-    }
+// Routes de réinitialisation de mot de passe
+router.post('/forgot-password', authController.forgotPassword);
+router.get('/reset-password/:token', authController.verifyResetToken);
+router.post('/reset-password', authController.resetPassword);
 
-    // Créer un nouvel utilisateur
-    const user = new User({
-      email,
-      password,
-      name,
-      authMethod: 'local'
-    });
+// Route pour changer le mot de passe (utilisateur connecté)
+router.post('/change-password', isAuthenticated, authController.changePassword);
 
-    await user.save();
+// Routes Google OAuth
+router.get('/google', passport.authenticate('google', { 
+  scope: ['profile', 'email'] 
+}));
 
-    // Connecter automatiquement l'utilisateur après inscription
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ 
-          message: 'Erreur lors de la connexion automatique' 
-        });
-      }
-      res.status(201).json({
-        message: 'Utilisateur créé avec succès',
-        user: user.toJSON()
-      });
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      message: 'Erreur lors de la création du compte',
-      error: error.message 
-    });
-  }
-});
-
-// Connexion locale
-router.post('/login', (req, res, next) => {
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      return res.status(500).json({ 
-        message: 'Erreur serveur',
-        error: err.message 
-      });
-    }
-    
-    if (!user) {
-      return res.status(401).json({ 
-        message: info.message || 'Identifiants invalides' 
-      });
-    }
-
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ 
-          message: 'Erreur lors de la connexion' 
-        });
-      }
-      
-      res.json({
-        message: 'Connexion réussie',
-        user: user.toJSON()
-      });
-    });
-  })(req, res, next);
-});
-
-// Déconnexion
-router.post('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      return res.status(500).json({ 
-        message: 'Erreur lors de la déconnexion' 
-      });
-    }
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ 
-          message: 'Erreur lors de la destruction de session' 
-        });
-      }
-      res.clearCookie('connect.sid');
-      res.json({ message: 'Déconnexion réussie' });
-    });
-  });
-});
-
-// Authentification Google - Redirection
-router.get('/google', 
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
-  })
-);
-
-// Callback Google
 router.get('/google/callback',
   passport.authenticate('google', { 
     failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed` 
   }),
-  (req, res) => {
-    // Redirection vers le frontend en cas de succès
-    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
-  }
+  authController.googleCallback
 );
 
-// Vérifier l'état de l'authentification
-router.get('/me', isAuthenticated, (req, res) => {
-  res.json({
-    user: req.user.toJSON(),
-    isAuthenticated: true
-  });
-});
-
-// Route protégée (exemple)
-router.get('/profile', isAuthenticated, (req, res) => {
-  res.json({
-    message: 'Accès autorisé au profil',
-    user: req.user.toJSON()
-  });
-});
+// Routes protégées
+router.get('/me', isAuthenticated, authController.getMe);
+router.get('/profile', isAuthenticated, authController.getProfile);
 
 module.exports = router;
