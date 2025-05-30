@@ -33,6 +33,28 @@ getAllDashboards: async (req, res) => {
     });
   }
 },
+getPublicDashboards: async (req, res) => {
+  try {
+    const dashboards = await Dashboard.find({ 
+      isPublic: true, 
+      active: true // Seulement les dashboards actifs
+    })
+      .populate('createdBy', 'name email')
+      .sort({ updatedAt: -1 });
+    
+    res.json({
+      success: true,
+      data: dashboards
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des dashboards publics',
+      error: error.message
+    });
+  }
+},
+
 // Dans dashboardController.js
 togglePublicStatus: async (req, res) => {
   try {
