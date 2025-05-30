@@ -245,7 +245,76 @@ const adminController = {
       });
     }
   },
+// Attribuer des tableaux à un utilisateur
+// In adminController.js
 
+// Get user's dashboards
+getUserDashboards: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId)
+      .populate('dashboards')
+      .select('dashboards');
+
+    res.json({
+      message: 'User dashboards retrieved',
+      dashboards: user.dashboards
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error getting user dashboards', 
+      error: error.message 
+    });
+  }
+},
+
+// Assign dashboards
+assignDashboards: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { dashboardIds } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { dashboards: { $each: dashboardIds } } },
+      { new: true }
+    ).populate('dashboards');
+
+    res.json({
+      message: 'Dashboards assigned successfully',
+      user
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error assigning dashboards', 
+      error: error.message 
+    });
+  }
+},
+
+// Unassign dashboards
+unassignDashboards: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { dashboardIds } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { dashboards: { $in: dashboardIds } } },
+      { new: true }
+    ).populate('dashboards');
+
+    res.json({
+      message: 'Dashboards unassigned successfully',
+      user
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error unassigning dashboards', 
+      error: error.message 
+    });
+  }
+},
   // Rechercher des utilisateurs
   searchUsers: async (req, res) => {
     try {

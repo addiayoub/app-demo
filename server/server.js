@@ -1,6 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const morgan = require('morgan');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -10,6 +13,8 @@ const app = express();
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const dashboardRoutes = require('./routes/dashboards');
+
 // Augmenter la limite des payloads
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -17,7 +22,8 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true
 }));
-
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
@@ -45,6 +51,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('Erreur MongoDB:', err));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/dashboards', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
@@ -55,3 +62,12 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Serveur en cours d'exécution sur le port ${PORT}`);
 });
+
+
+
+
+
+
+
+
+

@@ -8,6 +8,12 @@ export default defineConfig({
     host: true, // Permet d'exposer sur le réseau
     
   },
+  esbuild: {
+    jsxInject: `import React from 'react'`,
+    loader: 'jsx',
+    include: /src\/.*\.js$/,
+    exclude: [],
+  },
   plugins: [react(),
         tailwindcss(),
 

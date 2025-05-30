@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../Auth/AuthContext';
 import ReactECharts from 'echarts-for-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -12,14 +12,23 @@ import {
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Swal from 'sweetalert2';
+import DashboardAssignmentModal from './DashboardAssignmentModal';
+import { showDeleteConfirmation, showErrorAlert, showLoadingAlert, showSuccessAlert } from './alert';
 
-const AdminDashboard = () => {
+const User_admin = () => {
   const { user: currentUser, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDashboardAssignment, setShowDashboardAssignment] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  // États pour les tableaux de bord
+  const [dashboards, setDashboards] = useState([]);
+  const [assignedDashboards, setAssignedDashboards] = useState([]);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -39,85 +48,217 @@ const AdminDashboard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL;
-// Ajoutez cet état au début de votre composant
-const [avatarPreview, setAvatarPreview] = useState('');
-const [selectedFile, setSelectedFile] = useState(null);
+  // États pour l'avatar
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
 
+  const handleAssignDashboards = (userId) => {
+    setSelectedUserId(userId);
+    setShowDashboardAssignment(true);
+    fetchAssignedDashboards(userId);
+  };
 
-
-const uploadAvatarFile = async (file, userId) => {
-  const formData = new FormData();
-  formData.append('avatar', file);
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/avatar`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: formData
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `Échec de l'upload de l'avatar : ${response.status}`);
-    }
-    
-    const data = await response.json();
-    // Retourner les données complètes
-    return {
-      avatarPath: data.avatar,
-      user: data.user
-    };
-  } catch (error) {
-    console.error('Erreur upload avatar:', error);
-    throw error;
-  }
-};
-const getAvatarUrl = (avatar, name) => {
-  if (!avatar) {
-    return `https://api.dicebear.com/7.x/initials/svg?seed=${name || 'default'}`;
-  }
-  
-  // Si c'est déjà une URL complète (http/https), la retourner telle quelle
-  if (avatar.startsWith('http')) {
-    return avatar;
-  }
-  
-  // Si c'est un chemin relatif, construire l'URL complète
-  if (avatar.startsWith('/uploads/')) {
-    return `${API_BASE_URL}${avatar}`;
-  }
-  
-  // Sinon, retourner l'avatar tel quel (probablement une URL externe)
-  return avatar;
-};
-// Fonction pour gérer la sélection de fichier
-const handleFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    // Vérifier la taille du fichier (max 5 Mo)
-    if (file.size > 5 * 1024 * 1024) {
-      Swal.fire({
-        title: 'Erreur!',
-        text: 'La taille du fichier dépasse la limite de 5 Mo',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#3b82f6'
+  // Fonction pour charger les tableaux de bord
+  const fetchDashboards = async () => {
+    try {
+      setLoadingDashboards(true);
+      const response = await fetch(`${API_BASE_URL}/api/dashboards`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-      return;
+      
+      if (!response.ok) throw new Error('Échec du chargement des tableaux de bord');
+      
+      const data = await response.json();
+      setDashboards(data.data || []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des tableaux de bord:', error);
+      toast.error('Échec du chargement des tableaux de bord');
+    } finally {
+      setLoadingDashboards(false);
     }
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatarPreview(reader.result);
-      setFormData(prev => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
-  }
-};
-  // Animation variants
+  };
+
+  // Récupérer les tableaux de bord assignés
+  const fetchAssignedDashboards = async (userId) => {
+    try {
+      setLoadingDashboards(true);
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/dashboards`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Échec du chargement des tableaux assignés');
+      
+      const data = await response.json();
+      setAssignedDashboards(data.dashboards || []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des tableaux assignés:', error);
+      toast.error('Échec du chargement des tableaux assignés');
+    } finally {
+      setLoadingDashboards(false);
+    }
+  };
+
+  // Assigner un tableau de bord
+  const assignDashboard = async (dashboardId) => {
+    try {
+      const loadingAlert = showLoadingAlert('Assignation en cours...');
+      
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/assign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ dashboardIds: [dashboardId] })
+      });
+      
+      if (!response.ok) throw new Error('Échec de l\'assignation');
+      
+      const result = await response.json();
+      loadingAlert.close();
+      
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUserId 
+            ? { ...user, dashboards: [...(user.dashboards || []), dashboardId] } 
+            : user
+        )
+      );
+      
+      await fetchAssignedDashboards(selectedUserId);
+      showSuccessAlert('Assigné!', 'Tableau de bord assigné avec succès');
+    } catch (error) {
+      showErrorAlert('Erreur', 'Échec de l\'assignation du tableau de bord');
+    }
+  };
+
+  const unassignDashboard = async (dashboardId) => {
+    try {
+      const loadingAlert = showLoadingAlert('Retrait en cours...');
+      
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/unassign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ dashboardIds: [dashboardId] })
+      });
+      
+      if (!response.ok) throw new Error('Échec du retrait');
+      
+      const result = await response.json();
+      loadingAlert.close();
+      
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUserId 
+            ? { 
+                ...user, 
+                dashboards: (user.dashboards || []).filter(id => id !== dashboardId) 
+              } 
+            : user
+        )
+      );
+      
+      await fetchAssignedDashboards(selectedUserId);
+      showSuccessAlert('Retiré!', 'Tableau de bord retiré avec succès');
+    } catch (error) {
+      showErrorAlert('Erreur', 'Échec du retrait du tableau de bord');
+    }
+  };
+
+  // Charger les tableaux de bord au montage
+  useEffect(() => {
+    fetchDashboards();
+  }, []);
+
+  // Charger les tableaux assignés quand un utilisateur est sélectionné
+  useEffect(() => {
+    if (selectedUserId) {
+      fetchAssignedDashboards(selectedUserId);
+    }
+  }, [selectedUserId]);
+
+  const uploadAvatarFile = async (file, userId) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Échec de l'upload de l'avatar : ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return {
+        avatarPath: data.avatar,
+        user: data.user
+      };
+    } catch (error) {
+      console.error('Erreur upload avatar:', error);
+      throw error;
+    }
+  };
+
+  const getAvatarUrl = (avatar, name) => {
+    if (!avatar) {
+      return `https://api.dicebear.com/7.x/initials/svg?seed=${name || 'default'}`;
+    }
+    
+    if (avatar.startsWith('http')) {
+      return avatar;
+    }
+    
+    if (avatar.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${avatar}`;
+    }
+    
+    return avatar;
+  };
+
+  // Gérer la sélection de fichier
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        Swal.fire({
+          title: 'Erreur!',
+          text: 'La taille du fichier dépasse la limite de 5 Mo',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+        setFormData(prev => ({ ...prev, avatar: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Variantes d'animation
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -147,7 +288,7 @@ const handleFileChange = (e) => {
     tap: { scale: 0.98 }
   };
 
-  // FIX 1: Vérification de sécurité pour éviter l'erreur "Cannot read properties of undefined"
+  // Filtrage des utilisateurs
   const filteredUsers = users.filter(user => 
     user && user.name && user.email && (
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -155,7 +296,7 @@ const handleFileChange = (e) => {
     )
   );
 
-  // Fetch users and stats
+  // Charger les utilisateurs et les statistiques
   useEffect(() => {
     fetchUsers();
     fetchStats();
@@ -176,15 +317,15 @@ const handleFileChange = (e) => {
         return;
       }
       
-      if (!response.ok) throw new Error('Failed to fetch users');
+      if (!response.ok) throw new Error('Échec du chargement des utilisateurs');
       
       const data = await response.json();
-      setUsers(data || []); // FIX 2: Assurer qu'on a toujours un array
+      setUsers(data || []);
       updateChartData(data || []);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to load users');
+      console.error('Erreur lors du chargement des utilisateurs:', error);
+      toast.error('Échec du chargement des utilisateurs');
       setLoading(false);
     }
   };
@@ -198,7 +339,7 @@ const handleFileChange = (e) => {
         }
       });
       
-      if (!response.ok) throw new Error('Failed to fetch stats');
+      if (!response.ok) throw new Error('Échec du chargement des statistiques');
       
       const data = await response.json();
       setStats({
@@ -208,19 +349,19 @@ const handleFileChange = (e) => {
         inactiveUsers: data.stats.totalUsers - data.stats.verifiedUsers
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
-      toast.error('Failed to load statistics');
+      console.error('Erreur lors du chargement des statistiques:', error);
+      toast.error('Échec du chargement des statistiques');
     }
   };
 
-  // Update chart data with real data
+  // Mettre à jour les données des graphiques
   const updateChartData = (usersData) => {
     if (!Array.isArray(usersData) || usersData.length === 0) {
       setChartData({ roles: [], activity: [] });
       return;
     }
 
-    // Group by role
+    // Grouper par rôle
     const roleData = usersData.reduce((acc, user) => {
       if (user && user.role) {
         acc[user.role] = (acc[user.role] || 0) + 1;
@@ -228,7 +369,7 @@ const handleFileChange = (e) => {
       return acc;
     }, {});
 
-    // Group by month for activity
+    // Grouper par mois pour l'activité
     const monthlyData = usersData.reduce((acc, user) => {
       if (user && user.createdAt) {
         const date = new Date(user.createdAt);
@@ -236,7 +377,10 @@ const handleFileChange = (e) => {
         
         if (!acc[monthYear]) {
           acc[monthYear] = {
-            month: new Date(date.getFullYear(), date.getMonth()).toLocaleString('default', { month: 'short', year: 'numeric' }),
+            month: new Date(date.getFullYear(), date.getMonth()).toLocaleDateString('fr-FR', { 
+              month: 'short', 
+              year: 'numeric' 
+            }),
             newUsers: 0,
             activeUsers: Math.floor(Math.random() * (usersData.length / 3)) + 5
           };
@@ -246,7 +390,6 @@ const handleFileChange = (e) => {
       return acc;
     }, {});
 
-    // Convert to array and sort
     const sortedMonths = Object.values(monthlyData).sort((a, b) => 
       new Date(a.month) - new Date(b.month)
     );
@@ -254,16 +397,19 @@ const handleFileChange = (e) => {
     setChartData({
       roles: Object.entries(roleData).map(([name, value]) => ({ 
         value, 
-        name: name.charAt(0).toUpperCase() + name.slice(1) 
+        name: name === 'admin' ? 'Administrateur' : 'Utilisateur'
       })),
-      activity: sortedMonths.slice(-6) // Last 6 months
+      activity: sortedMonths.slice(-6)
     });
   };
 
-  // Delete user
+  // Supprimer un utilisateur
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+    const userToDelete = users.find(u => u._id === userId);
+    showDeleteConfirmation(userToDelete.name, async () => {
       try {
+        const loadingAlert = showLoadingAlert('Suppression en cours...');
+        
         const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
           method: 'DELETE',
           credentials: 'include',
@@ -273,21 +419,22 @@ const handleFileChange = (e) => {
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`Erreur HTTP! statut: ${response.status}`);
         }
         
-        // FIX 3: Mise à jour immédiate de l'UI
+        loadingAlert.close();
+        
         setUsers(prevUsers => prevUsers.filter(u => u._id !== userId));
-        toast.success('User deleted successfully');
-        fetchStats(); // Refresh stats
+        fetchStats();
+        showSuccessAlert('Supprimé!', 'Utilisateur supprimé avec succès');
       } catch (error) {
-        console.error('Error deleting user:', error);
-        toast.error('Failed to delete user');
+        showErrorAlert('Erreur', 'Échec de la suppression de l\'utilisateur');
+        console.error('Erreur lors de la suppression:', error);
       }
-    }
+    });
   };
 
-  // Start editing user
+  // Commencer l'édition d'un utilisateur
   const startEditing = (user) => {
     setEditingUser(user);
     setShowAddForm(false);
@@ -299,176 +446,132 @@ const handleFileChange = (e) => {
     });
   };
 
-  // Show add user form
+  // Afficher le formulaire d'ajout
   const showAddUserForm = () => {
     setEditingUser(null);
     setShowAddForm(true);
     setFormData({ name: '', email: '', role: 'user', password: '' });
   };
 
- // Fonction pour réinitialiser le formulaire (modifiez hideForms)
-const hideForms = () => {
-  setEditingUser(null);
-  setShowAddForm(false);
-  setFormData({ name: '', email: '', role: 'user', password: '', avatar: null });
-  setAvatarPreview('');
-  setSelectedFile(null);
-};
+  // Masquer les formulaires
+  const hideForms = () => {
+    setEditingUser(null);
+    setShowAddForm(false);
+    setFormData({ name: '', email: '', role: 'user', password: '', avatar: null });
+    setAvatarPreview('');
+    setSelectedFile(null);
+  };
 
-  // Handle form input changes
+  // Gérer les changements d'input
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-// Fonction handleUpdateUser - CORRIGÉE
-const handleUpdateUser = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  
-  try {
-    let avatarUrl = formData.avatar;
+  // Mettre à jour un utilisateur
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     
-    // Si un fichier a été sélectionné, l'uploader d'abord
-    if (selectedFile) {
-      const uploadResult = await uploadAvatarFile(selectedFile, editingUser._id);
-      avatarUrl = uploadResult.avatarPath;
+    try {
+      const loadingAlert = showLoadingAlert('Mise à jour en cours...');
+      
+      let avatarUrl = formData.avatar;
+      if (selectedFile) {
+        const uploadResult = await uploadAvatarFile(selectedFile, editingUser._id);
+        avatarUrl = uploadResult.avatarPath;
+      }
+      
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role
+      };
+      
+      if (formData.password) updateData.password = formData.password;
+      if (avatarUrl) updateData.avatar = avatarUrl;
+      
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${editingUser._id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Échec de la mise à jour');
+      }
+      
+      const result = await response.json();
+      loadingAlert.close();
+      
+      setUsers(prevUsers => 
+        prevUsers.map(u => u._id === editingUser._id ? result.user : u)
+      );
+      
+      updateChartData(users.map(u => u._id === editingUser._id ? result.user : u));
+      hideForms();
+      
+      showSuccessAlert('Succès!', 'Utilisateur mis à jour avec succès');
+      fetchStats();
+    } catch (error) {
+      showErrorAlert('Erreur', error.message || 'Échec de la mise à jour');
+    } finally {
+      setIsSubmitting(false);
+      setAvatarPreview('');
+      setSelectedFile(null);
     }
-    
-    // Préparer les données de mise à jour
-    const updateData = {
-      name: formData.name,
-      email: formData.email,
-      role: formData.role
-    };
-    
-    // Inclure le mot de passe seulement s'il est fourni
-    if (formData.password) {
-      updateData.password = formData.password;
-    }
-    
-    // Inclure l'avatar s'il y en a un
-    if (avatarUrl) {
-      updateData.avatar = avatarUrl;
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${editingUser._id}`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(updateData)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Échec de la mise à jour de l\'utilisateur');
-    }
-    
-    const result = await response.json();
-    const updatedUser = result.user;
-    
-    // Mettre à jour la liste des utilisateurs avec les données complètes du serveur
-    setUsers(prevUsers => 
-      prevUsers.map(u => u._id === editingUser._id ? updatedUser : u)
-    );
-    
-    // Mettre à jour les données du graphique
-    const newUsersData = users.map(u => u._id === editingUser._id ? updatedUser : u);
-    updateChartData(newUsersData);
-    
-    hideForms();
-    
-    Swal.fire({
-      title: 'Succès!',
-      text: 'Utilisateur mis à jour avec succès',
-      icon: 'success',
-      showConfirmButton: false,
-      timer: 1500
-    });
-    
-    fetchStats();
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour:', error);
-    Swal.fire({
-      title: 'Erreur!',
-      text: error.message || 'Échec de la mise à jour de l\'utilisateur',
-      icon: 'error',
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#3b82f6'
-    });
-  } finally {
-    setIsSubmitting(false);
-    setAvatarPreview('');
-    setSelectedFile(null);
-  }
-};
+  };
 
-// FIX: Create new user avec mise à jour immédiate
-const handleCreateUser = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  
-  try {
-    let createData = { ...formData };
+  // Créer un nouvel utilisateur
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     
-    // Si un fichier a été sélectionné mais pas encore uploadé, utiliser l'URL de prévisualisation
-    if (selectedFile && avatarPreview) {
-      createData.avatar = avatarPreview;
+    try {
+      const loadingAlert = showLoadingAlert('Création en cours...');
+      
+      let createData = { ...formData };
+      if (selectedFile && avatarPreview) {
+        createData.avatar = avatarPreview;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(createData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Échec de la création');
+      }
+      
+      const result = await response.json();
+      loadingAlert.close();
+      
+      setUsers(prevUsers => [...prevUsers, result.user]);
+      updateChartData([...users, result.user]);
+      hideForms();
+      
+      showSuccessAlert('Succès!', 'Utilisateur créé avec succès');
+      fetchStats();
+    } catch (error) {
+      showErrorAlert('Erreur', error.message || 'Échec de la création');
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(createData)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create user');
-    }
-    
-    const result = await response.json();
-    const newUser = result.user;
-    
-    // Ajouter le nouvel utilisateur à la liste avec les données complètes du serveur
-    setUsers(prevUsers => [...prevUsers, newUser]);
-    
-    // Mettre à jour les graphiques avec la nouvelle liste
-    const newUsersData = [...users, newUser];
-    updateChartData(newUsersData);
-    
-    hideForms();
-    
-    Swal.fire({
-      title: 'Success!',
-      text: 'User created successfully',
-      icon: 'success',
-      showConfirmButton: false,
-      timer: 1500
-    });
-    
-    fetchStats();
-  } catch (error) {
-    console.error('Error creating user:', error);
-    Swal.fire({
-      title: 'Error!',
-      text: error.message || 'Failed to create user',
-      icon: 'error',
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#3b82f6'
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-  // FIX 7: Correction des données de légende pour les graphiques
+  };
+
+  // Configuration du graphique des rôles
   const userRoleChart = {
     backgroundColor: 'transparent',
     animationDuration: 2000,
@@ -480,12 +583,11 @@ const handleCreateUser = async (e) => {
       orient: 'vertical',
       right: 10,
       top: 'center',
-      // FIX: Utiliser les noms des données réelles au lieu de noms fixes
       data: chartData.roles.map(item => item.name)
     },
     series: [
       {
-        name: 'User Roles',
+        name: 'Rôles Utilisateurs',
         type: 'pie',
         radius: ['50%', '70%'],
         avoidLabelOverlap: false,
@@ -520,7 +622,7 @@ const handleCreateUser = async (e) => {
     ]
   };
 
-  // User Activity Chart with real data
+  // Configuration du graphique d'activité
   const userActivityChart = {
     backgroundColor: 'transparent',
     animationDuration: 2000,
@@ -532,13 +634,13 @@ const handleCreateUser = async (e) => {
       formatter: function(params) {
         return `
           <strong>${params[0].axisValue}</strong><br/>
-          New Users: <b>${params[0].data}</b><br/>
-          Active Users: <b>${params[1].data}</b>
+          Nouveaux Utilisateurs: <b>${params[0].data}</b><br/>
+          Utilisateurs Actifs: <b>${params[1].data}</b>
         `;
       }
     },
     legend: {
-      data: ['New Users', 'Active Users'],
+      data: ['Nouveaux Utilisateurs', 'Utilisateurs Actifs'],
       bottom: 0
     },
     grid: {
@@ -578,7 +680,7 @@ const handleCreateUser = async (e) => {
     },
     series: [
       {
-        name: 'New Users',
+        name: 'Nouveaux Utilisateurs',
         type: 'bar',
         barWidth: '40%',
         data: chartData.activity.map(d => d.newUsers),
@@ -590,15 +692,15 @@ const handleCreateUser = async (e) => {
           return idx * 100;
         },
         markLine: {
-          data: [{ type: 'average', name: 'Average' }],
+          data: [{ type: 'average', name: 'Moyenne' }],
           label: {
             position: 'end',
-            formatter: 'Avg: {c}'
+            formatter: 'Moy: {c}'
           }
         }
       },
       {
-        name: 'Active Users',
+        name: 'Utilisateurs Actifs',
         type: 'line',
         smooth: true,
         data: chartData.activity.map(d => d.activeUsers),
@@ -615,41 +717,41 @@ const handleCreateUser = async (e) => {
           return idx * 100 + 100;
         },
         markLine: {
-          data: [{ type: 'average', name: 'Average' }],
+          data: [{ type: 'average', name: 'Moyenne' }],
           label: {
             position: 'end',
-            formatter: 'Avg: {c}'
+            formatter: 'Moy: {c}'
           }
         }
       }
     ]
   };
 
-  // Stats cards data
+  // Cartes de statistiques
   const statsCards = [
     { 
-      title: 'Total Users', 
+      title: 'Total Utilisateurs', 
       value: stats.totalUsers, 
       icon: <Users size={24} />, 
       color: 'bg-blue-100 text-blue-600',
       trend: stats.totalUsers > 0 ? 'up' : 'stable'
     },
     { 
-      title: 'Admins', 
+      title: 'Administrateurs', 
       value: stats.admins, 
       icon: <UserCheck size={24} />, 
       color: 'bg-green-100 text-green-600',
       trend: 'stable'
     },
     { 
-      title: 'Regular Users', 
+      title: 'Utilisateurs Standards', 
       value: stats.regularUsers, 
       icon: <UserPlus size={24} />, 
       color: 'bg-purple-100 text-purple-600',
       trend: stats.regularUsers > 0 ? 'up' : 'stable'
     },
     { 
-      title: 'Inactive Users', 
+      title: 'Utilisateurs Inactifs', 
       value: stats.inactiveUsers, 
       icon: <UserX size={24} />, 
       color: 'bg-red-100 text-red-600',
@@ -664,38 +766,8 @@ const handleCreateUser = async (e) => {
       variants={containerVariants}
       className="min-h-screen bg-gray-50"
     >
-      
-      {/* Header */}
-      <motion.header 
-        variants={itemVariants}
-        className="bg-white shadow-sm sticky top-0 z-10"
-      >
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-50 h-15 rounded-full bg-gradient-to-r  flex items-center justify-center">
-             <img src="/ID&A TECH .png" alt="" />
-
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-600 hidden md:inline cursor-pointer">Welcome, {currentUser?.name}</span>
-            <motion.button 
-              onClick={logout}
-              className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors flex items-center cursor-pointer"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <span className="hidden md:inline"></span>
-              <span className="">
-                <LogOut size={20} />
-              </span>
-            </motion.button>
-          </div>
-        </div>
-      </motion.header>
-
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Stats Cards */}
+        {/* Cartes de Statistiques */}
         <motion.div 
           variants={containerVariants}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
@@ -737,12 +809,12 @@ const handleCreateUser = async (e) => {
           ))}
         </motion.div>
 
-        {/* Charts Section */}
+        {/* Section des Graphiques */}
         <motion.section 
           variants={containerVariants}
           className="mb-8"
         >
-          <h2 className="text-xl font-semibold mb-4">Analytics</h2>
+          <h2 className="text-xl font-semibold mb-4">Analyses</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <motion.div 
               variants={itemVariants}
@@ -750,7 +822,7 @@ const handleCreateUser = async (e) => {
               whileHover={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">User Activity (Last 6 Months)</h3>
+                <h3 className="text-lg font-semibold">Activité Utilisateurs (6 derniers mois)</h3>
                 <motion.button 
                   className="p-2 rounded-lg hover:bg-gray-100"
                   onClick={fetchStats}
@@ -773,7 +845,7 @@ const handleCreateUser = async (e) => {
               whileHover={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">User Roles Distribution</h3>
+                <h3 className="text-lg font-semibold">Répartition des Rôles</h3>
                 <motion.button 
                   className="p-2 rounded-lg hover:bg-gray-100"
                   onClick={fetchUsers}
@@ -791,23 +863,21 @@ const handleCreateUser = async (e) => {
             </motion.div>
           </div>
         </motion.section>
-
-        {/* User Management Section */}
+{/* Section de Gestion des Utilisateurs */}
         <motion.section 
           variants={itemVariants}
           className="bg-white rounded-xl shadow-sm overflow-hidden"
         >
           <div className="p-6 border-b border-gray-200">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-              <h2 className="text-xl font-semibold">User Management</h2>
               <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
                 <div className="relative w-full md:w-64">
-                  <div className="absolute inset-y-0 left-0 pl-3 pb-5 flex items-center pointer-events-none cursor-pointer">
+                  <div className="absolute inset-y-0 left-0 pl-3  flex items-center pointer-events-none cursor-pointer">
                     <Search size={18} className="text-gray-400" />
                   </div>
                   <input
                     type="text"
-                    placeholder="Search users..."
+                    placeholder="Rechercher des utilisateurs..."
                     className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -820,13 +890,12 @@ const handleCreateUser = async (e) => {
                   whileTap={{ scale: 0.98 }}
                 >
                   <UserPlus size={18} className="mr-2 " />
-                  Add User
                 </motion.button>
               </div>
             </div>
           </div>
 
-          {/* User Form - Appears when editing or adding */}
+          {/* Formulaire Utilisateur - Apparaît lors de l'édition ou de l'ajout */}
           <AnimatePresence>
             {(editingUser !== null || showAddForm) && (
               <motion.div 
@@ -837,7 +906,7 @@ const handleCreateUser = async (e) => {
                 className="p-6 border-b border-gray-200"
               >
                 <h3 className="text-md font-medium mb-4 cursor-pointer">
-                  {editingUser ? 'Edit User' : 'Create New User'}
+                  {editingUser ? 'Modifier l\'Utilisateur' : 'Créer un Nouvel Utilisateur'}
                 </h3>
                 <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -848,18 +917,18 @@ const handleCreateUser = async (e) => {
 >
   <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
   <div className="flex items-center space-x-4">
-    {/* Preview de l'avatar */}
+    {/* Aperçu de l'avatar */}
     <div className="flex-shrink-0">
   <img 
   src={avatarPreview || getAvatarUrl(formData.avatar, formData.name)}
-  alt="Preview avatar" 
+  alt="Aperçu de l'avatar" 
   className="h-16 w-16 rounded-full border-2 border-gray-200 object-cover"
 />
     </div>
     
     {/* Container pour les inputs */}
     <div className="flex-1 space-y-2">
-      {/* Input file pour upload */}
+      {/* Input file pour téléchargement */}
       <div>
         <input
           type="file"
@@ -913,7 +982,7 @@ const handleCreateUser = async (e) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.1 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
                       <input
                         type="text"
                         name="name"
@@ -943,15 +1012,15 @@ const handleCreateUser = async (e) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
                       <select
                         name="role"
                         value={formData.role}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 cursor-pointer focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
+                        <option value="user">Utilisateur</option>
+                        <option value="admin">Administrateur</option>
                       </select>
                     </motion.div>
                     <motion.div
@@ -960,7 +1029,7 @@ const handleCreateUser = async (e) => {
                       transition={{ delay: 0.4 }}
                     >
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {editingUser ? 'New Password (leave blank to keep)' : 'Password'}
+                        {editingUser ? 'Nouveau Mot de Passe (laisser vide pour conserver)' : 'Mot de Passe'}
                       </label>
                       <input
                         type="password"
@@ -981,7 +1050,7 @@ const handleCreateUser = async (e) => {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      Cancel
+                      Annuler
                     </motion.button>
                     <motion.button
                       type="submit"
@@ -993,12 +1062,12 @@ const handleCreateUser = async (e) => {
                       {isSubmitting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing...
+                          Traitement en cours...
                         </>
                       ) : editingUser ? (
-                        'Update User'
+                        'Mettre à Jour l\'Utilisateur'
                       ) : (
-                        'Create User'
+                        'Créer l\'Utilisateur'
                       )}
                     </motion.button>
                   </div>
@@ -1007,15 +1076,15 @@ const handleCreateUser = async (e) => {
             )}
           </AnimatePresence>
 
-          {/* Users Table */}
+          {/* Tableau des Utilisateurs */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -1025,14 +1094,14 @@ const handleCreateUser = async (e) => {
                     <td colSpan="5" className="px-6 py-8 text-center">
                       <div className="flex justify-center items-center space-x-2">
                         <Loader2 size={20} className="animate-spin" />
-                        <span>Loading users...</span>
+                        <span>Chargement des utilisateurs...</span>
                       </div>
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                      No users found matching your criteria
+                      Aucun utilisateur trouvé correspondant à vos critères
                     </td>
                   </tr>
                 ) : (
@@ -1078,7 +1147,7 @@ const handleCreateUser = async (e) => {
                               ${user.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
                             whileHover={{ scale: 1.05 }}
                           >
-                            {user.role}
+                            {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
                           </motion.span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1087,7 +1156,7 @@ const handleCreateUser = async (e) => {
                               ${user.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}
                             whileHover={{ scale: 1.05 }}
                           >
-                            {user.isVerified ? 'Verified' : 'Pending'}
+                            {user.isVerified ? 'Vérifié' : 'En attente'}
                           </motion.span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1095,17 +1164,36 @@ const handleCreateUser = async (e) => {
                             <motion.button
                               onClick={() => startEditing(user)}
                               className="text-blue-600 hover:text-blue-900 cursor-pointer p-1 rounded hover:bg-blue-50"
-                              title="Edit"
+                              title="Modifier"
                               whileHover={{ scale: 1.2 }}
                               whileTap={{ scale: 0.9 }}
                             >
                               <Edit size={18} />
                             </motion.button>
+                       
+<div className="relative inline-block">
+  <motion.button
+    onClick={() => handleAssignDashboards(user._id)}
+    className="text-purple-600 hover:text-purple-900 p-2 rounded hover:bg-purple-50 cursor-pointer transition-colors duration-200"
+    title="Assigner des Tableaux de Bord"
+    whileHover={{ scale: 1.1 }}
+    whileTap={{ scale: 0.95 }}
+  >
+    <BarChart2 size={18} />
+  </motion.button>
+  
+  {/* Badge fixe qui ne bouge pas avec le hover */}
+  {user.dashboards && user.dashboards.length > 0 && (
+    <div className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
+      {user.dashboards.length}
+    </div>
+  )}
+</div>
                             {user._id !== currentUser?._id && (
                               <motion.button
                                 onClick={() => handleDeleteUser(user._id)}
                                 className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                title="Delete"
+                                title="Supprimer"
                                 whileHover={{ scale: 1.2 }}
                                 whileTap={{ scale: 0.9 }}
                               >
@@ -1118,13 +1206,31 @@ const handleCreateUser = async (e) => {
                     ))}
                   </AnimatePresence>
                 )}
+
               </tbody>
             </table>
+            
           </div>
+
+          {showDashboardAssignment && (
+  <DashboardAssignmentModal
+    userId={selectedUserId}
+    onClose={() => {
+      setShowDashboardAssignment(false);
+      setSelectedUserId(null);
+    }}
+    dashboards={dashboards}
+    assignedDashboards={assignedDashboards}
+    onAssign={assignDashboard}
+    onUnassign={unassignDashboard}
+  />
+)}
         </motion.section>
       </main>
+      
     </motion.div>
+    
   );
 };
 
-export default AdminDashboard;
+export default User_admin;

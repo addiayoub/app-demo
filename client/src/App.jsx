@@ -8,7 +8,7 @@ import RegisterForm from './Auth/RegisterForm';
 import EmailVerification from './Auth/EmailVerification';
 import Dashboard from './Auth/Dashboard';
 import './App.css';
-import AdminDashboard from './Auth/AdminDashboard.JSX';
+import AdminLayout from './Admin/AdminLayout ';
 
 const AppRoutes = () => {
   const [currentView, setCurrentView] = useState('login');
@@ -50,7 +50,7 @@ const AppRoutes = () => {
 
   // Check if user is authenticated and user data is available
   if (isAuthenticated && user) {
-    return user.role === 'admin' ? <AdminDashboard /> : <Dashboard />;
+    return user.role === 'admin' ? <AdminLayout /> : <Dashboard />;
   }
 
   // If authenticated but user data is not yet loaded, show loading

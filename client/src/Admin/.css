@@ -1,0 +1,26 @@
+/* Dans votre fichier CSS global */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css');
+
+.swal2-popup {
+  border-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+.swal2-title {
+  font-size: 1.5rem !important;
+  color: #1f2937 !important;
+}
+
+.swal2-html-container {
+  font-size: 1rem !important;
+  color: #4b5563 !important;
+}
+
+.swal2-confirm {
+  transition: all 0.2s ease !important;
+}
+
+.swal2-confirm:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}

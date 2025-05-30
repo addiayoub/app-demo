@@ -48,6 +48,17 @@
       enum: ['user', 'admin'],
       default: 'user'
     },
+    dashboards: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dashboard',
+    default: []
+  }],
+  // Ajoutez aussi un champ pour les permissions spéciales si nécessaire
+  permissions: {
+    type: Map,
+    of: String,
+    default: {}
+  },
     // Token de vérification d'email
     verificationToken: {
       type: String,

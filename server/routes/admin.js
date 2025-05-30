@@ -27,6 +27,10 @@ router.post('/users', adminController.createUser);
 router.put('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 router.post('/users/:id/avatar', upload.single('avatar'), adminController.uploadAvatar); // Nouvelle route
+// Dashboard assignment routes
+router.get('/users/:userId/dashboards', isAuthenticated, isAdmin, adminController.getUserDashboards);
+router.post('/users/:userId/assign', isAuthenticated, isAdmin, adminController.assignDashboards);
+router.post('/users/:userId/unassign', isAuthenticated, isAdmin, adminController.unassignDashboards);
 
 // Routes de statistiques et recherche
 router.get('/stats', adminController.getUserStats);
