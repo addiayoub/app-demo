@@ -49,7 +49,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className=" bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-6">
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -96,7 +96,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className=" bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Inscription</h2>
         
