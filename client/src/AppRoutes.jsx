@@ -5,11 +5,17 @@ import Dashboard from './Auth/Dashboard';
 import AdminLayout from './Admin/AdminLayout ';
 import EmailVerification from './Auth/EmailVerification';
 import ResetPasswordForm from './Auth/ResetPasswordForm';
+import CustomLoader from './CustomLoader/CustomLoader';
+import UserDashboard from './UserDashboard/UserDashboard';
+
+// Composant Loader personnalisé
+
 
 const AppRoutes = () => {
   const [currentView, setCurrentView] = useState('home');
   const { isAuthenticated, isLoading, user } = useAuth();
   const [hasCheckedUrl, setHasCheckedUrl] = useState(false);
+  const [showLoader, setShowLoader] = useState(true);
 
   useEffect(() => {
     if (hasCheckedUrl) return;
@@ -33,49 +39,33 @@ const AppRoutes = () => {
     setHasCheckedUrl(true);
   }, [hasCheckedUrl]);
 
-  // Loading state
+  // Timer pour afficher le loader pendant 3 secondes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowLoader(false);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Afficher le loader pendant 3 secondes au chargement initial
+  if (showLoader) {
+    return <CustomLoader message="Chargement..." />;
+  }
+
+  // Loading state - Utilisation du loader personnalisé
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
-            <div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-r-purple-600 animate-spin-reverse mx-auto"></div>
-          </div>
-          <p className="text-gray-600 text-lg font-medium">Chargement...</p>
-          <div className="mt-2 flex justify-center space-x-1">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <CustomLoader message="Chargement..." />;
   }
 
   // Check if user is authenticated and user data is available
   if (isAuthenticated && user) {
-    return user.role === 'admin' ? <AdminLayout /> : <Dashboard />;
+    return user.role === 'admin' ? <AdminLayout /> : <UserDashboard />;
   }
 
   // If authenticated but user data is not yet loaded, show loading
   if (isAuthenticated && !user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
-            <div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-r-purple-600 animate-spin-reverse mx-auto"></div>
-          </div>
-          <p className="text-gray-600 text-lg font-medium">Chargement des données utilisateur...</p>
-          <div className="mt-2 flex justify-center space-x-1">
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <CustomLoader message="Chargement des données utilisateur..." />;
   }
 
   // Handle special routes (email verification, password reset)
@@ -93,22 +83,6 @@ const AppRoutes = () => {
   return (
     <div className="App">
       {renderSpecialRoutes()}
-      
-      {/* Custom Styles for enhanced animations */}
-      <style >{`
-        @keyframes spin-reverse {
-          from {
-            transform: rotate(360deg);
-          }
-          to {
-            transform: rotate(0deg);
-          }
-        }
-        
-        .animate-spin-reverse {
-          animation: spin-reverse 1s linear infinite;
-        }
-      `}</style>
     </div>
   );
 };
