@@ -89,7 +89,7 @@ useEffect(() => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         variants={sidebarVariants}
-        className={` cursor-pointer bg-gradient-to-b from-blue-00 to-blue-900 text-white  shadow-xl relative z-20`}
+        className={` cursor-pointer bg-gradient-to-b from-slate-900 to-slate-800  text-white  shadow-xl relative z-20`}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       >
         <div className="flex flex-col h-full">

@@ -518,65 +518,6 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
-  const handleExport = async (type) => {
-    try {
-      switch (type) {
-        case 'png':
-          console.log('Export PNG');
-          break;
-        case 'pdf':
-          console.log('Export PDF');
-          break;
-        default:
-          break;
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-    }
-  };
-
-  const printDashboard = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${dashboard.name} - Impression</title>
-        <style>
-          body { margin: 0; padding: 0; }
-          .print-header { 
-            padding: 20px; 
-            text-align: center; 
-            border-bottom: 1px solid #eee;
-            margin-bottom: 20px;
-          }
-          iframe { 
-            width: 100%; 
-            height: calc(100vh - 100px); 
-            border: none;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="print-header">
-          <h1>${dashboard.name}</h1>
-          <p>${dashboard.description || ''}</p>
-        </div>
-        <iframe src="${dashboard.url}"></iframe>
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 1000);
-          };
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   useEffect(() => {
     setIsLoading(true);
     setIframeLoaded(false);
