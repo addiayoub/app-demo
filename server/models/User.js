@@ -48,11 +48,16 @@
       enum: ['user', 'admin'],
       default: 'user'
     },
-    dashboards: [{
+ dashboards: [{
+  dashboard: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Dashboard',
-    default: []
-  }],
+    ref: 'Dashboard'
+  },
+  expiresAt: {
+    type: String, // Changé de Date à String
+    default: null
+  }
+}],
   // Ajoutez aussi un champ pour les permissions spéciales si nécessaire
   permissions: {
     type: Map,

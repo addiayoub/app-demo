@@ -1,36 +1,81 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { LayoutDashboard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+  import { motion, AnimatePresence } from 'framer-motion';
+  import { 
+    Clock, 
+    Search, 
+    Filter, 
+    BarChart2, 
+    ChevronDown, 
+    ChevronUp,
+    Globe,
+    Lock,
+    Eye,
+    EyeOff,
+    Calendar,
+    RotateCcw,
+    Plus,
+    LogOut,
+    Download,
+    Printer,
+    FileText,
+    FileSliders,
+    FileSignature,
+    AlertCircle,
+    Info
+  } from 'lucide-react';
+  import { useAuth } from '../Auth/AuthContext';
+  import axios from 'axios';
+import DashboardViewer from './DashboardViewer';
 
-const EmptyState = ({ hasDashboards, resetFilters }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.3 }}
-      className="bg-white rounded-xl shadow-lg p-8 text-center"
-    >
-      <div className="mx-auto bg-blue-100 text-blue-600 rounded-full p-6 w-24 h-24 flex items-center justify-center mb-6">
-        <LayoutDashboard size={36} />
-      </div>
-      <h3 className="text-xl font-medium text-gray-900 mb-2">
-        {hasDashboards ? "Aucun dashboard sélectionné" : "Aucun tableau de bord disponible"}
-      </h3>
-      <p className="text-gray-500 mb-6">
-        {hasDashboards 
-          ? "Sélectionnez un tableau de bord dans la liste pour commencer"
-          : "Aucun tableau de bord ne vous a été assigné pour le moment"}
-      </p>
-      {!hasDashboards && (
-        <button
-          onClick={resetFilters}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+// Composant EmptyState avec animations
+  const EmptyState = ({ hasDashboards, resetFilters }) => {
+    return (
+      <motion.div 
+        className="flex items-center justify-center h-full"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.div
+          className="text-center p-8"
+          initial={{ y: 20 }}
+          animate={{ y: 0 }}
+          transition={{ type: 'spring', stiffness: 300 }}
         >
-          Actualiser la liste
-        </button>
-      )}
-    </motion.div>
-  );
-};
+          <motion.div
+            animate={{
+              y: [0, -10, 0],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 3,
+              ease: "easeInOut",
+            }}
+          >
+            <BarChart2 size={64} className="mx-auto text-gray-400 mb-4" />
+          </motion.div>
+          <h3 className="text-xl font-medium text-gray-900 mb-2">
+            {hasDashboards ? 'Sélectionnez un dashboard' : 'Aucun dashboard disponible'}
+          </h3>
+          <p className="text-gray-500 mb-4">
+            {hasDashboards 
+              ? 'Choisissez un dashboard dans la sidebar pour le visualiser' 
+              : 'Vous n\'avez pas encore de dashboards assignés'
+            }
+          </p>
+          {hasDashboards && (
+            <motion.button
+              onClick={resetFilters}
+              className="text-blue-600 hover:text-blue-800 font-medium"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Réinitialiser les filtres
+            </motion.button>
+          )}
+        </motion.div>
+      </motion.div>
+    );
+  };
 
 export default EmptyState;

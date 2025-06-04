@@ -1,148 +1,85 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Download, 
-  BarChart2,
-  Printer,
-  FileText,
-  FileSliders,
-  FileSignature,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+  import React, { useState, useEffect } from 'react';
+  import { motion, AnimatePresence } from 'framer-motion';
+  import { 
+    Clock, 
+    Search, 
+    Filter, 
+    BarChart2, 
+    ChevronDown, 
+    ChevronUp,
+    Globe,
+    Lock,
+    Eye,
+    EyeOff,
+    Calendar,
+    RotateCcw,
+    Plus,
+    LogOut,
+    Download,
+    Printer,
+    FileText,
+    FileSliders,
+    FileSignature,
+    AlertCircle,
+    Info
+  } from 'lucide-react';
+  import { useAuth } from '../Auth/AuthContext';
+  import axios from 'axios';
 
-const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
+
+ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
 
-  const handleExport = async (type) => {
-    const dashboardElement = document.getElementById('dashboard-iframe-container');
+  // Récupérer les données correctes du dashboard
+  const dashboardData = dashboard.data || dashboard;
+
+  useEffect(() => {
+    setIsLoading(true);
+    setIframeLoaded(false);
     
-    try {
-      switch (type) {
-        case 'png':
-          const canvas = await html2canvas(dashboardElement);
-          const pngUrl = canvas.toDataURL('image/png');
-          const link = document.createElement('a');
-          link.href = pngUrl;
-          link.download = `${dashboard.name}-dashboard.png`;
-          link.click();
-          break;
-          
-        case 'pdf':
-          const pdfCanvas = await html2canvas(dashboardElement);
-          const imgData = pdfCanvas.toDataURL('image/png');
-          const pdf = new jsPDF('landscape');
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`${dashboard.name}-dashboard.pdf`);
-          break;
-          
-        case 'excel':
-          const ws = XLSX.utils.json_to_sheet([
-            {
-              'Nom du Dashboard': dashboard.name,
-              'Description': dashboard.description || '',
-              'URL': dashboard.url,
-              'Date de création': new Date(dashboard.createdAt).toLocaleDateString(),
-              'Statut': dashboard.active ? 'Actif' : 'Inactif',
-              'Visibilité': dashboard.isPublic ? 'Public' : 'Privé'
-            }
-          ]);
-          
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Dashboard Info');
-          XLSX.writeFile(wb, `${dashboard.name}-metadata.xlsx`);
-          break;
-          
-        case 'csv':
-          const csvData = [
-            ['Nom du Dashboard', 'Description', 'URL', 'Date de création', 'Statut', 'Visibilité'],
-            [
-              dashboard.name,
-              dashboard.description || '',
-              dashboard.url,
-              new Date(dashboard.createdAt).toLocaleDateString(),
-              dashboard.active ? 'Actif' : 'Inactif',
-              dashboard.isPublic ? 'Public' : 'Privé'
-            ]
-          ];
-          
-          const csvContent = csvData.map(row => row.join(',')).join('\n');
-          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-          saveAs(blob, `${dashboard.name}-metadata.csv`);
-          break;
-          
-        default:
-          break;
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('Une erreur est survenue lors de l\'export.');
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    // Calcul du temps restant avant expiration
+    if (dashboard.expiresAt) {
+      const updateTimeLeft = () => {
+        const now = new Date();
+        const expiresAt = new Date(dashboard.expiresAt);
+        const diff = expiresAt - now;
+        
+        if (diff <= 0) {
+          setTimeLeft('Expiré');
+          return;
+        }
+        
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      };
+      
+      updateTimeLeft();
+      const interval = setInterval(updateTimeLeft, 1000);
+      
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
+    
+    return () => clearTimeout(timer);
+  }, [dashboard]);
+
+  const handleIframeLoad = () => {
+    setIframeLoaded(true);
   };
 
-  const printDashboard = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${dashboard.name} - Impression</title>
-        <style>
-          body { margin: 0; padding: 0; }
-          .print-header { 
-            padding: 20px; 
-            text-align: center; 
-            border-bottom: 1px solid #eee;
-            margin-bottom: 20px;
-          }
-          .print-footer { 
-            padding: 10px; 
-            text-align: center; 
-            font-size: 12px; 
-            color: #666;
-            margin-top: 20px;
-          }
-          iframe { 
-            width: 100%; 
-            height: calc(100vh - 100px); 
-            border: none;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="print-header">
-          <h1>${dashboard.name}</h1>
-          <p>${dashboard.description || ''}</p>
-          <p>Imprimé le ${new Date().toLocaleDateString()} par ${user.name}</p>
-        </div>
-        
-        <iframe src="${dashboard.url}"></iframe>
-        
-        <div class="print-footer">
-          © ${new Date().getFullYear()} ${window.location.hostname}
-        </div>
-        
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 1000);
-          };
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+  const isExpired = dashboard.expiresAt && new Date(dashboard.expiresAt) < new Date();
 
   return (
     <motion.div
@@ -150,132 +87,206 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="bg-white rounded-xl shadow-lg overflow-hidden"
+      className="bg-white rounded-xl shadow-lg overflow-hidden h-full"
     >
       <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+        >
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            {dashboard.name}
-            {!dashboard.active && (
-              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Inactif</span>
+            {dashboardData.name}
+            {!dashboardData.active && (
+              <motion.span 
+                className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500 }}
+              >
+                Inactif
+              </motion.span>
             )}
-            {dashboard.isPublic && (
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Public</span>
+            
+            {dashboard.expiresAt && (
+              <motion.span 
+                className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                  isExpired 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500, delay: 0.2 }}
+              >
+                <Clock size={12} />
+                {isExpired ? 'Expiré' : timeLeft}
+              </motion.span>
             )}
           </h2>
-          {dashboard.description && (
-            <p className="text-gray-600 mt-1">{dashboard.description}</p>
+          {dashboardData.description && (
+            <p className="text-gray-600 mt-1">{dashboardData.description}</p>
           )}
-        </div>
+        </motion.div>
         
-        <div className="flex gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-all"
-            >
-              <Download size={16} />
-              Exporter
-              {isExportMenuOpen ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
-            </button>
-            
-            <AnimatePresence>
-              {isExportMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200"
-                  onMouseLeave={() => setIsExportMenuOpen(false)}
-                >
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        handleExport('png');
-                        setIsExportMenuOpen(false);
-                      }}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <FileText className="mr-2" size={14} />
-                      Image (PNG)
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExport('pdf');
-                        setIsExportMenuOpen(false);
-                      }}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <FileSignature className="mr-2" size={14} />
-                      PDF
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExport('excel');
-                        setIsExportMenuOpen(false);
-                      }}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <FileSliders className="mr-2" size={14} />
-                      Excel
-                    </button>
-                    <div className="border-t border-gray-200"></div>
-                    <button
-                      onClick={() => {
-                        printDashboard();
-                        setIsExportMenuOpen(false);
-                      }}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <Printer className="mr-2" size={14} />
-                      Imprimer
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+        <motion.div 
+          className="flex gap-2"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          {/* Boutons d'action */}
+        </motion.div>
       </div>
       
-      <div className="h-[calc(100vh-250px)] min-h-[500px] relative">
-        {dashboard.active ? (
-          <div id="dashboard-iframe-container" className="w-full h-full">
-            <iframe 
-              src={dashboard.url} 
-              title={dashboard.name}
-              className="w-full h-full border-0"
-              loading="lazy"
-            />
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <div className="text-center p-6 max-w-md">
-              <div className="mx-auto bg-red-100 text-red-600 rounded-full p-4 w-16 h-16 flex items-center justify-center mb-4">
+      <div className="h-[calc(100vh-200px)] min-h-[500px] relative">
+        {!dashboardData.active ? (
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center bg-gray-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div 
+              className="text-center p-6 max-w-md"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+            >
+              <motion.div 
+                className="mx-auto bg-red-100 text-red-600 rounded-full p-4 w-16 h-16 flex items-center justify-center mb-4"
+                animate={{
+                  rotate: [0, 10, -10, 0],
+                }}
+                transition={{
+                  duration: 0.5,
+                  ease: "easeInOut",
+                }}
+              >
                 <BarChart2 size={24} />
-              </div>
+              </motion.div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Dashboard désactivé</h3>
               <p className="text-gray-500 mb-4">
                 Ce tableau de bord a été désactivé par l'administrateur et n'est plus accessible.
               </p>
-              <button
+              <motion.button
                 onClick={() => setSelectedDashboard(null)}
                 className="text-blue-600 hover:text-blue-800 font-medium"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 Retour à la liste
-              </button>
-            </div>
-          </div>
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        ) : isExpired ? (
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center bg-gray-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div 
+              className="text-center p-6 max-w-md"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+            >
+              <motion.div 
+                className="mx-auto bg-yellow-100 text-yellow-600 rounded-full p-4 w-16 h-16 flex items-center justify-center mb-4"
+                animate={{
+                  rotate: [0, 10, -10, 0],
+                }}
+                transition={{
+                  duration: 0.5,
+                  ease: "easeInOut",
+                }}
+              >
+                <AlertCircle size={24} />
+              </motion.div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Accès expiré</h3>
+              <p className="text-gray-500 mb-4">
+                Votre accès à ce tableau de bord a expiré le {new Date(dashboard.expiresAt).toLocaleDateString()}.
+                Veuillez contacter l'administrateur pour un renouvellement.
+              </p>
+              <motion.button
+                onClick={() => setSelectedDashboard(null)}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Retour à la liste
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <>
+            {(!iframeLoaded || isLoading) && (
+              <motion.div 
+                className="absolute inset-0 flex items-center justify-center bg-gray-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  animate={{
+                    rotate: 360,
+                  }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 1.5,
+                    ease: "linear",
+                  }}
+                >
+                  <BarChart2 size={48} className="text-gray-400" />
+                </motion.div>
+              </motion.div>
+            )}
+            
+            <motion.div 
+              id="dashboard-iframe-container" 
+              className="w-full h-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: iframeLoaded ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <iframe 
+                src={dashboardData.url} 
+                title={dashboardData.name}
+                className="w-full h-full border-0"
+                loading="lazy"
+                onLoad={handleIframeLoad}
+              />
+            </motion.div>
+          </>
         )}
       </div>
       
-      <div className="p-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex justify-between items-center">
-        <div>
-          Assigné le {new Date(dashboard.createdAt).toLocaleDateString()}
-        </div>
-        <div>
-          Dernière mise à jour : {new Date(dashboard.updatedAt).toLocaleDateString()}
-        </div>
+      <div className="p-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+        >
+          Assigné le {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
+            ? new Date(dashboardData.createdAt).toLocaleDateString() 
+            : 'Date invalide'}
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-2"
+        >
+          {dashboard.expiresAt && (
+            <>
+              <Clock size={14} />
+              {isExpired ? 'Expiré le ' : 'Expire le '}
+              {new Date(dashboard.expiresAt).toLocaleDateString()}
+            </>
+          )}
+        </motion.div>
       </div>
     </motion.div>
   );

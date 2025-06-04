@@ -253,7 +253,7 @@ getUserDashboards: async (req, res) => {
   try {
     const { userId } = req.params;
     const user = await User.findById(userId)
-      .populate('dashboards')
+      .populate('dashboards.dashboard')
       .select('dashboards');
 
     res.json({
@@ -269,20 +269,43 @@ getUserDashboards: async (req, res) => {
 },
 
 // Assign dashboards
+// Dans adminController.js
 assignDashboards: async (req, res) => {
   try {
     const { userId } = req.params;
-    const { dashboardIds } = req.body;
+    const { dashboardAssignments } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $addToSet: { dashboards: { $each: dashboardIds } } },
-      { new: true }
-    ).populate('dashboards');
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Supprimer les assignations existantes pour les dashboards mis à jour
+    const dashboardIdsToUpdate = dashboardAssignments.map(a => a.dashboardId);
+    user.dashboards = user.dashboards.filter(
+      d => !dashboardIdsToUpdate.includes(d.dashboard.toString())
+    );
+
+    // Ajouter les nouvelles assignations (conserver la chaîne de date telle quelle)
+    dashboardAssignments.forEach(assignment => {
+      user.dashboards.push({
+        dashboard: assignment.dashboardId,
+        expiresAt: assignment.expiresAt // On garde la chaîne telle quelle
+      });
+    });
+
+    // Désactiver la conversion automatique des dates
+    const options = { timestamps: false, strict: false };
+    await user.save(options);
+    
+    // Récupérer l'utilisateur mis à jour
+    const updatedUser = await User.findById(userId)
+      .populate('dashboards.dashboard')
+      .select('dashboards');
 
     res.json({
       message: 'Dashboards assigned successfully',
-      user
+      dashboards: updatedUser.dashboards
     });
   } catch (error) {
     res.status(500).json({ 
@@ -292,6 +315,7 @@ assignDashboards: async (req, res) => {
   }
 },
 
+
 // Unassign dashboards
 unassignDashboards: async (req, res) => {
   try {
@@ -300,17 +324,43 @@ unassignDashboards: async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { $pull: { dashboards: { $in: dashboardIds } } },
-      { new: true }
-    ).populate('dashboards');
+      { $pull: { dashboards: { dashboard: { $in: dashboardIds } } },
+       new: true }
+    ).populate('dashboards.dashboard');
 
     res.json({
       message: 'Dashboards unassigned successfully',
-      user
+      dashboards: user.dashboards
     });
   } catch (error) {
     res.status(500).json({ 
       message: 'Error unassigning dashboards', 
+      error: error.message 
+    });
+  }
+},
+
+// Get active dashboards (non-expired)
+getActiveDashboards: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const now = new Date();
+    
+    const user = await User.findById(userId)
+      .populate('dashboards.dashboard')
+      .select('dashboards');
+
+    const activeDashboards = user.dashboards.filter(d => 
+      !d.expiresAt || new Date(d.expiresAt) > now
+    );
+
+    res.json({
+      message: 'Active dashboards retrieved',
+      dashboards: activeDashboards
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error getting active dashboards', 
       error: error.message 
     });
   }

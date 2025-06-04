@@ -81,100 +81,101 @@ const User_admin = () => {
     }
   };
 
-  // Récupérer les tableaux de bord assignés
-  const fetchAssignedDashboards = async (userId) => {
-    try {
-      setLoadingDashboards(true);
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/dashboards`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) throw new Error('Échec du chargement des tableaux assignés');
-      
-      const data = await response.json();
-      setAssignedDashboards(data.dashboards || []);
-    } catch (error) {
-      console.error('Erreur lors du chargement des tableaux assignés:', error);
-      toast.error('Échec du chargement des tableaux assignés');
-    } finally {
-      setLoadingDashboards(false);
-    }
-  };
+const assignDashboard = async (dashboardId, expiresAt) => {
+  try {
+    const loadingAlert = showLoadingAlert('Assignation en cours...');
 
-  // Assigner un tableau de bord
-  const assignDashboard = async (dashboardId) => {
-    try {
-      const loadingAlert = showLoadingAlert('Assignation en cours...');
-      
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/assign`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ dashboardIds: [dashboardId] })
-      });
-      
-      if (!response.ok) throw new Error('Échec de l\'assignation');
-      
-      const result = await response.json();
-      loadingAlert.close();
-      
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user._id === selectedUserId 
-            ? { ...user, dashboards: [...(user.dashboards || []), dashboardId] } 
-            : user
-        )
-      );
-      
-      await fetchAssignedDashboards(selectedUserId);
-      showSuccessAlert('Assigné!', 'Tableau de bord assigné avec succès');
-    } catch (error) {
-      showErrorAlert('Erreur', 'Échec de l\'assignation du tableau de bord');
-    }
-  };
+    // Envoyer la date telle quelle sans conversion UTC
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/assign`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({
+        dashboardAssignments: [{
+          dashboardId,
+          expiresAt: expiresAt ? expiresAt.toISOString() : null,
+        }],
+      }),
+    });
 
-  const unassignDashboard = async (dashboardId) => {
-    try {
-      const loadingAlert = showLoadingAlert('Retrait en cours...');
-      
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/unassign`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ dashboardIds: [dashboardId] })
-      });
-      
-      if (!response.ok) throw new Error('Échec du retrait');
-      
-      const result = await response.json();
-      loadingAlert.close();
-      
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user._id === selectedUserId 
-            ? { 
-                ...user, 
-                dashboards: (user.dashboards || []).filter(id => id !== dashboardId) 
-              } 
-            : user
-        )
-      );
-      
-      await fetchAssignedDashboards(selectedUserId);
-      showSuccessAlert('Retiré!', 'Tableau de bord retiré avec succès');
-    } catch (error) {
-      showErrorAlert('Erreur', 'Échec du retrait du tableau de bord');
-    }
-  };
+
+    if (!response.ok) throw new Error('Échec de l\'assignation');
+
+    const result = await response.json();
+    loadingAlert.close();
+
+    await fetchUsers();
+    await fetchAssignedDashboards(selectedUserId);
+
+    showSuccessAlert('Assigné!', 'Tableau de bord assigné avec succès');
+  } catch (error) {
+    showErrorAlert('Erreur', 'Échec de l\'assignation du tableau de bord');
+  }
+};
+
+const unassignDashboard = async (dashboardId) => {
+  try {
+    const loadingAlert = showLoadingAlert('Retrait en cours...');
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/unassign`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({ dashboardIds: [dashboardId] }),
+    });
+
+    if (!response.ok) throw new Error('Échec du retrait');
+
+    const result = await response.json();
+    loadingAlert.close();
+
+    await fetchUsers();
+    await fetchAssignedDashboards(selectedUserId);
+
+    showSuccessAlert('Retiré!', 'Tableau de bord retiré avec succès');
+  } catch (error) {
+    showErrorAlert('Erreur', 'Échec du retrait du tableau de bord');
+  }
+};
+
+useEffect(() => {
+  if (selectedUserId) {
+    setAssignedDashboards([]);
+    fetchAssignedDashboards(selectedUserId);
+  } else {
+    setAssignedDashboards([]);
+  }
+}, [selectedUserId]);
+
+const fetchAssignedDashboards = async (userId) => {
+  try {
+    setLoadingDashboards(true);
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/dashboards`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+
+    if (!response.ok) throw new Error('Échec du chargement des tableaux assignés');
+
+    const data = await response.json();
+    console.log('Données des tableaux assignés:', data); // Débogage
+    setAssignedDashboards(data.dashboards || []);
+  } catch (error) {
+    console.error('Erreur lors du chargement des tableaux assignés:', error);
+    toast.error('Échec du chargement des tableaux assignés');
+    setAssignedDashboards([]);
+  } finally {
+    setLoadingDashboards(false);
+  }
+};
 
   // Charger les tableaux de bord au montage
   useEffect(() => {
@@ -1182,10 +1183,10 @@ const User_admin = () => {
     <BarChart2 size={18} />
   </motion.button>
   
-  {/* Badge fixe qui ne bouge pas avec le hover */}
-  {user.dashboards && user.dashboards.length > 0 && (
+  {/* Utilisez assignedDashboards.length si disponible, sinon user.dashboards.length */}
+  {(assignedDashboards.length > 0 || (user.dashboards && user.dashboards.length > 0)) && (
     <div className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
-      {user.dashboards.length}
+      {selectedUserId === user._id ? assignedDashboards.length : (user.dashboards?.length || 0)}
     </div>
   )}
 </div>
