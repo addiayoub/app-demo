@@ -44,7 +44,12 @@ class CleanupService {
   async cleanupExpiredDashboards() {
     if (this.isRunning) {
       console.log('🔄 Nettoyage déjà en cours...');
-      return;
+      return {
+        totalExpiredDashboards: 0,
+        usersAffected: 0,
+        message: 'Nettoyage déjà en cours',
+        timestamp: this.formatDateTime(this.getCurrentTime())
+      };
     }
 
     this.isRunning = true;
@@ -57,13 +62,73 @@ class CleanupService {
 
       // Log avec l'heure locale correcte
       console.log(`🧹 Début du nettoyage manuel des dashboards expirés... ${this.formatDateTime(now)}`);
+      console.log(`🕐 Heure actuelle: ${now.toISOString()}`);
 
-      // Trouver tous les utilisateurs avec des dashboards expirés
-      const usersWithExpiredDashboards = await User.find({
-        'dashboards.expiresAt': { $lt: now, $ne: null }
+      // CORRECTION 1: Rechercher correctement les utilisateurs avec des dashboards expirés
+      // On cherche tous les utilisateurs qui ont au moins un dashboard avec expiresAt défini
+      const allUsersWithDashboards = await User.find({
+        'dashboards': { $exists: true, $not: { $size: 0 } }
       });
       
-      if (usersWithExpiredDashboards.length === 0) {
+      console.log(`👥 ${allUsersWithDashboards.length} utilisateur(s) avec des dashboards trouvé(s)`);
+
+      const usersToUpdate = [];
+
+      // CORRECTION 2: Vérifier chaque utilisateur individuellement
+      for (const user of allUsersWithDashboards) {
+        const expiredDashboards = [];
+        const validDashboards = [];
+
+        console.log(`🔍 Vérification utilisateur: ${user.email}`);
+        console.log(`📊 Dashboards de l'utilisateur:`, user.dashboards.map(d => ({
+          dashboard: d.dashboard,
+          expiresAt: d.expiresAt,
+          expiresAtISO: d.expiresAt ? new Date(d.expiresAt).toISOString() : null,
+          isExpired: d.expiresAt ? new Date(d.expiresAt) < now : false
+        })));
+
+        // CORRECTION 3: Séparer les dashboards expirés des valides
+        user.dashboards.forEach(dashboard => {
+          if (dashboard.expiresAt) {
+            const expirationDate = new Date(dashboard.expiresAt);
+            
+            // Debug: afficher la comparaison
+            console.log(`  📋 Dashboard ${dashboard.dashboard}:`);
+            console.log(`     - Expire le: ${expirationDate.toISOString()}`);
+            console.log(`     - Maintenant: ${now.toISOString()}`);
+            console.log(`     - Expiré?: ${expirationDate < now}`);
+            
+            if (expirationDate < now) {
+              expiredDashboards.push(dashboard);
+              console.log(`     ❌ EXPIRÉ - Sera supprimé`);
+            } else {
+              validDashboards.push(dashboard);
+              console.log(`     ✅ VALIDE - Sera conservé`);
+            }
+          } else {
+            // Dashboard sans expiration = valide
+            validDashboards.push(dashboard);
+            console.log(`  📋 Dashboard ${dashboard.dashboard}: ♾️ PERMANENT - Sera conservé`);
+          }
+        });
+
+        // Si des dashboards sont expirés, préparer la mise à jour
+        if (expiredDashboards.length > 0) {
+          console.log(`🔄 ${expiredDashboards.length} dashboard(s) expiré(s) trouvé(s) pour ${user.email}`);
+          
+          usersToUpdate.push({
+            user: user,
+            expiredDashboards: expiredDashboards,
+            validDashboards: validDashboards
+          });
+          
+          totalExpiredDashboards += expiredDashboards.length;
+          usersAffected++;
+        }
+      }
+
+      // CORRECTION 4: Effectuer les mises à jour si nécessaire
+      if (usersToUpdate.length === 0) {
         console.log('✅ Aucun dashboard expiré trouvé');
         return {
           totalExpiredDashboards: 0,
@@ -73,32 +138,24 @@ class CleanupService {
         };
       }
 
-      console.log(`📊 ${usersWithExpiredDashboards.length} utilisateur(s) avec des dashboards expirés trouvé(s)`);
-
-      // Nettoyer chaque utilisateur
-      for (const user of usersWithExpiredDashboards) {
-        const expiredDashboards = user.dashboards.filter(d => 
-          d.expiresAt && new Date(d.expiresAt) < now
-        );
-
-        if (expiredDashboards.length > 0) {
-          console.log(`🔄 Nettoyage de ${expiredDashboards.length} dashboard(s) expiré(s) pour l'utilisateur ${user.email}`);
-          
-          // Supprimer les dashboards expirés
-          user.dashboards = user.dashboards.filter(d => 
-            !d.expiresAt || new Date(d.expiresAt) >= now
-          );
-
-          await user.save();
-          
-          totalExpiredDashboards += expiredDashboards.length;
-          usersAffected++;
-
-          // Log des dashboards supprimés avec formatage de date
-          expiredDashboards.forEach(dashboard => {
-            console.log(`  ❌ Dashboard ${dashboard.dashboard} expiré le ${this.formatDateTime(new Date(dashboard.expiresAt))}`);
-          });
-        }
+      // Mettre à jour chaque utilisateur
+      for (const updateInfo of usersToUpdate) {
+        const { user, expiredDashboards, validDashboards } = updateInfo;
+        
+        console.log(`💾 Mise à jour de l'utilisateur ${user.email}:`);
+        console.log(`   - Dashboards à supprimer: ${expiredDashboards.length}`);
+        console.log(`   - Dashboards à conserver: ${validDashboards.length}`);
+        
+        // CORRECTION 5: Mettre à jour avec seulement les dashboards valides
+        user.dashboards = validDashboards;
+        await user.save();
+        
+        console.log(`✅ Utilisateur ${user.email} mis à jour avec succès`);
+        
+        // Log des dashboards supprimés
+        expiredDashboards.forEach(dashboard => {
+          console.log(`  ❌ Dashboard ${dashboard.dashboard} supprimé (expiré le ${this.formatDateTime(new Date(dashboard.expiresAt))})`);
+        });
       }
 
       // Mettre à jour les statistiques
@@ -157,17 +214,29 @@ class CleanupService {
   async getExpiredDashboardsCount() {
     try {
       const now = this.getCurrentTime();
-      const users = await User.find({
-        'dashboards.expiresAt': { $lt: now, $ne: null }
+      console.log(`🔍 Vérification des dashboards expirés à: ${now.toISOString()}`);
+      
+      const allUsersWithDashboards = await User.find({
+        'dashboards': { $exists: true, $not: { $size: 0 } }
       });
 
       let totalExpired = 0;
       const expiredDetails = [];
       
-      users.forEach(user => {
-        const expired = user.dashboards.filter(d => 
-          d.expiresAt && new Date(d.expiresAt) < now
-        );
+      allUsersWithDashboards.forEach(user => {
+        const expired = user.dashboards.filter(d => {
+          if (!d.expiresAt) return false;
+          const expirationDate = new Date(d.expiresAt);
+          const isExpired = expirationDate < now;
+          
+          console.log(`📋 Dashboard ${d.dashboard} pour ${user.email}:`);
+          console.log(`   - Expire: ${expirationDate.toISOString()}`);
+          console.log(`   - Maintenant: ${now.toISOString()}`);
+          console.log(`   - Expiré: ${isExpired}`);
+          
+          return isExpired;
+        });
+        
         totalExpired += expired.length;
         
         if (expired.length > 0) {
@@ -183,9 +252,11 @@ class CleanupService {
         }
       });
 
+      console.log(`📊 Résultat: ${totalExpired} dashboard(s) expiré(s) trouvé(s)`);
+
       return {
         totalExpiredDashboards: totalExpired,
-        usersAffected: users.length,
+        usersAffected: expiredDetails.length,
         details: expiredDetails,
         checkedAt: this.formatDateTime(now)
       };

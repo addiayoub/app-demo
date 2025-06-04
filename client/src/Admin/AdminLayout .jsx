@@ -229,67 +229,22 @@ const performManualCleanup = async () => {
   };
 
   // Fonction pour vérifier les dashboards expirés sans les supprimer
-const checkExpiredDashboards = async () => {
-  try {
-    const response = await axios.get('/api/admin/expired-dashboards', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    
-    const expiredInfo = response.data;
-    
-    if (expiredInfo.totalExpiredDashboards > 0) {
-      console.log(`📊 ${expiredInfo.totalExpiredDashboards} dashboard(s) expiré(s) trouvé(s)`);
-      
-      const checkNotification = {
-        id: Date.now(),
-        type: 'warning',
-        message: `${expiredInfo.totalExpiredDashboards} dashboard(s) sur le point d'expirer`,
-        details: `${expiredInfo.usersAffected} utilisateur(s) affecté(s) - Nettoyage en cours...`,
-        timestamp: new Date(),
-        read: false
-      };
-      
-      setNotifications(prev => [checkNotification, ...prev].slice(0, 50));
-      setUnreadCount(prev => prev + 1);
-    } else {
-      console.log('ℹ️ Aucun dashboard sur le point d’expirer');
-    }
-    
-    return expiredInfo;
-  } catch (error) {
-    console.error('❌ Erreur lors de la vérification des dashboards expirés:', error);
-    
-    const errorNotification = {
-      id: Date.now(),
-      type: 'error',
-      message: 'Erreur lors de la vérification',
-      details: error.response?.data?.message || error.message || 'Erreur inconnue',
-      timestamp: new Date(),
-      read: false
-    };
-    
-    setNotifications(prev => [errorNotification, ...prev].slice(0, 50));
-    setUnreadCount(prev => prev + 1);
-    
-    return null;
-  }
-};
+
   // useEffect pour le nettoyage automatique toutes les 30 secondes
+// Remplacer votre useEffect actuel par celui-ci :
+
+// Remplacez votre useEffect actuel par celui-ci :
+
 useEffect(() => {
   // Fonction qui combine vérification et nettoyage
   const performAutomaticCleanupCycle = async () => {
-    console.log('🔍 Vérification des dashboards expirés...');
+    console.log('🔍 Début du cycle de nettoyage automatique...');
     
-    // D'abord vérifier s'il y a des dashboards expirés
-    const expiredInfo = await checkExpiredDashboards();
+    // Exécuter le nettoyage automatique complet (POST)
+    await performManualCleanup();
     
-    // Ensuite effectuer le nettoyage
-    const cleanupResult = await performManualCleanup();
-    
-    // Récupérer les statistiques mises à jour
-    await fetchCleanupStats();
+    // Optionnel: récupérer les statistiques mises à jour (GET)
+    // await fetchCleanupStats();
   };
 
   // Exécuter immédiatement au démarrage
@@ -304,6 +259,71 @@ useEffect(() => {
     console.log('🛑 Arrêt du nettoyage automatique');
   };
 }, []);
+
+// Alternative: Si vous voulez plus de contrôle, vous pouvez aussi faire :
+
+useEffect(() => {
+  const performAutomaticCleanupCycle = async () => {
+    try {
+      console.log('🔄 Déclenchement du nettoyage automatique toutes les 30s...');
+      
+      // Appel direct du POST
+      const response = await axios.post('/api/admin/manual-cleanup', {}, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = response.data;
+      setCleanupStats(result);
+      
+      // Créer une notification si des dashboards ont été supprimés
+      if (result.result && result.result.totalExpiredDashboards > 0) {
+        const newNotification = {
+          id: Date.now(),
+          type: 'cleanup',
+          message: `Nettoyage automatique effectué`,
+          details: `${result.result.totalExpiredDashboards} dashboard(s) expiré(s) supprimé(s)`,
+          timestamp: new Date(),
+          read: false
+        };
+        
+        setNotifications(prev => [newNotification, ...prev].slice(0, 50));
+        setUnreadCount(prev => prev + 1);
+      }
+      
+      console.log('✅ Nettoyage automatique terminé');
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du nettoyage automatique:', error);
+      
+      const errorNotification = {
+        id: Date.now(),
+        type: 'error',
+        message: 'Erreur lors du nettoyage automatique',
+        details: error.response?.data?.message || error.message,
+        timestamp: new Date(),
+        read: false
+      };
+      
+      setNotifications(prev => [errorNotification, ...prev].slice(0, 50));
+      setUnreadCount(prev => prev + 1);
+    }
+  };
+
+  // Exécuter immédiatement
+  performAutomaticCleanupCycle();
+
+  // Puis toutes les 30 secondes
+  const interval = setInterval(performAutomaticCleanupCycle, 30000);
+
+  return () => {
+    clearInterval(interval);
+    console.log('🛑 Arrêt du nettoyage automatique');
+  };
+}, []);
+
+
 
   const getAvatarUrl = (avatar, name) => {
     if (!avatar) {
@@ -351,9 +371,11 @@ useEffect(() => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         variants={sidebarVariants}
-        className={`cursor-pointer bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-xl relative z-20`}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      >
+
+transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className={` cursor-pointer bg-gradient-to-b from-slate-900 to-slate-800  text-white  shadow-xl relative z-20`}>
+        
+      
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-5 flex items-center justify-between">
