@@ -3,6 +3,7 @@ import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
 import ForgotPasswordForm from '../Auth/ForgotPasswordForm';
 import { motion } from 'framer-motion';
+import PricingSection from './PricingSection';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -352,6 +353,7 @@ const Home = ({ onLogin }) => {
           </div>
         </div>
       </section>
+      <PricingSection />
 
       {/* Contact Section */}
       <section id="contact" className="py-16 bg-white">
