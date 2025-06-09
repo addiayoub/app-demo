@@ -166,7 +166,6 @@ const fetchAssignedDashboards = async (userId) => {
     if (!response.ok) throw new Error('Échec du chargement des tableaux assignés');
 
     const data = await response.json();
-    console.log('Données des tableaux assignés:', data); // Débogage
     setAssignedDashboards(data.dashboards || []);
   } catch (error) {
     console.error('Erreur lors du chargement des tableaux assignés:', error);

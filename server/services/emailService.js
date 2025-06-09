@@ -5,7 +5,7 @@ class EmailService {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT || 587,
-      secure: false, // true pour 465, false pour autres ports
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -13,54 +13,153 @@ class EmailService {
     });
   }
 
+  getBaseTemplate(name, content) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Template</title>
+        <style>
+          /* Base styles */
+          body { 
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333333;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 0;
+          }
+          .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          }
+          .header {
+            padding: 30px 20px;
+            text-align: center;
+            color: white;
+          }
+          .logo {
+            max-height: 60px;
+            margin-bottom: 15px;
+          }
+          .content {
+            padding: 30px;
+          }
+          .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #666666;
+            font-size: 12px;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 30px;
+            margin: 20px 0;
+            font-weight: 500;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+          }
+          .link {
+            word-break: break-all;
+            background: #f0f0f0;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            font-size: 14px;
+          }
+          .divider {
+            height: 1px;
+            background: #eeeeee;
+            margin: 25px 0;
+          }
+          .social-icons {
+            margin: 20px 0;
+          }
+          .social-icons a {
+            margin: 0 10px;
+            text-decoration: none;
+          }
+          .note {
+            background: #f8f9fa;
+            border-left: 4px solid #6e8efb;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            ${process.env.EMAIL_LOGO_URL ? 
+              `<img src="${process.env.EMAIL_LOGO_URL}" alt="Company Logo" class="logo">` : 
+              `<h1>${process.env.APP_NAME || 'Notre Application'}</h1>`
+            }
+          </div>
+          
+          <div class="content">
+            <h2 style="color: #444444; margin-top: 0;">Bonjour ${name},</h2>
+            
+            ${content}
+            
+            <div class="divider"></div>
+            
+            <p style="margin-bottom: 0;">Cordialement,<br>L'équipe ${process.env.APP_NAME || ''}</p>
+          </div>
+          
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} ${process.env.APP_NAME || 'Notre Application'}. Tous droits réservés.</p>
+            <div class="social-icons">
+              ${process.env.FACEBOOK_URL ? `<a href="${process.env.FACEBOOK_URL}"><img src="https://cdn-icons-png.flaticon.com/512/124/124010.png" width="24" alt="Facebook"></a>` : ''}
+              ${process.env.TWITTER_URL ? `<a href="${process.env.TWITTER_URL}"><img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" width="24" alt="Twitter"></a>` : ''}
+              ${process.env.INSTAGRAM_URL ? `<a href="${process.env.INSTAGRAM_URL}"><img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" width="24" alt="Instagram"></a>` : ''}
+              ${process.env.LINKEDIN_URL ? `<a href="${process.env.LINKEDIN_URL}"><img src="https://cdn-icons-png.flaticon.com/512/3536/3536505.png" width="24" alt="LinkedIn"></a>` : ''}
+            </div>
+            <p>
+              <a href="${process.env.SITE_URL}" style="color: #666666; text-decoration: none;">Visitez notre site</a> | 
+              <a href="${process.env.SITE_URL}/#Contactez-nous" style="color: #666666; text-decoration: none;">Contact</a> | 
+              <a href="${process.env.SITE_URL}" style="color: #666666; text-decoration: none;">Confidentialité</a>
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
   async sendVerificationEmail(email, name, verificationToken) {
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
     
+    const content = `
+      <p>Merci de vous être inscrit sur notre plateforme. Pour compléter votre inscription, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :</p>
+      
+      <p style="text-align: center;">
+        <a href="${verificationUrl}" class="button">Vérifier mon email</a>
+      </p>
+      
+      <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
+      <div class="link">${verificationUrl}</div>
+      
+      <div class="note">
+        <p><strong>Note :</strong> Ce lien expirera dans 24 heures. Si vous n'avez pas créé de compte, vous pouvez ignorer cet email en toute sécurité.</p>
+      </div>
+    `;
+    
     const mailOptions = {
-      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Vérifiez votre adresse email',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Vérification Email</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-            .button { display: inline-block; background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Vérification de votre compte</h1>
-            </div>
-            <div class="content">
-              <h2>Bonjour ${name},</h2>
-              <p>Merci de vous être inscrit ! Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous :</p>
-              <p style="text-align: center; color:white;">
-                <a href="${verificationUrl}" class="button">Vérifier mon email</a>
-              </p>
-              <p>Ou copiez et collez ce lien dans votre navigateur :</p>
-              <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 3px;">
-                ${verificationUrl}
-              </p>
-              <p><strong>Ce lien expire dans 24 heures.</strong></p>
-              <p>Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.</p>
-            </div>
-            <div class="footer">
-              <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
+      subject: 'Vérification de votre adresse email',
+      html: this.getBaseTemplate(name, content)
     };
 
     try {
@@ -73,39 +172,23 @@ class EmailService {
   }
 
   async sendWelcomeEmail(email, name) {
+    const content = `
+      <p>Bienvenue sur ${process.env.APP_NAME || 'notre plateforme'} ! Nous sommes ravis de vous compter parmi nos membres.</p>
+      
+      <p>Votre compte a été activé avec succès et vous pouvez maintenant accéder à toutes les fonctionnalités.</p>
+      
+      <p style="text-align: center;">
+        <a href="${process.env.CLIENT_URL}" class="button">Commencer l'exploration</a>
+      </p>
+      
+      <p>Si vous avez des questions ou besoin d'aide, n'hésitez pas à répondre à cet email ou à consulter notre centre d'aide.</p>
+    `;
+    
     const mailOptions = {
-      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Bienvenue !',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Bienvenue</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🎉 Bienvenue !</h1>
-            </div>
-            <div class="content">
-              <h2>Félicitations ${name} !</h2>
-              <p>Votre email a été vérifié avec succès. Votre compte est maintenant actif !</p>
-              <p>Vous pouvez maintenant profiter de toutes les fonctionnalités de notre plateforme.</p>
-              <p>Merci de nous faire confiance !</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
+      subject: `Bienvenue sur ${process.env.APP_NAME || 'notre plateforme'} !`,
+      html: this.getBaseTemplate(name, content)
     };
 
     try {
@@ -119,58 +202,31 @@ class EmailService {
   async sendResetPasswordEmail(email, name, resetToken) {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
     
+    const content = `
+      <p>Nous avons reçu une demande de réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour procéder :</p>
+      
+      <p style="text-align: center;">
+        <a href="${resetUrl}" class="button">Réinitialiser mon mot de passe</a>
+      </p>
+      
+      <p>Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email. Sinon, copiez et collez ce lien dans votre navigateur :</p>
+      <div class="link">${resetUrl}</div>
+      
+      <div class="note">
+        <p><strong>Sécurité :</strong></p>
+        <ul>
+          <li>Ce lien expirera dans 1 heure</li>
+          <li>Ne partagez jamais ce lien avec qui que ce soit</li>
+          <li>Notre équipe ne vous demandera jamais votre mot de passe</li>
+        </ul>
+      </div>
+    `;
+    
     const mailOptions = {
-      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
       to: email,
       subject: 'Réinitialisation de votre mot de passe',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Réinitialisation mot de passe</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-            .button { display: inline-block; background: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔐 Réinitialisation de mot de passe</h1>
-            </div>
-            <div class="content">
-              <h2>Bonjour ${name},</h2>
-              <p>Vous avez demandé la réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
-              <p style="text-align: center;">
-                <a href="${resetUrl}" class="button">Réinitialiser mon mot de passe</a>
-              </p>
-              <p>Ou copiez et collez ce lien dans votre navigateur :</p>
-              <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 3px;">
-                ${resetUrl}
-              </p>
-              <div class="warning">
-                <p><strong>⚠️ Important :</strong></p>
-                <ul>
-                  <li>Ce lien expire dans <strong>1 heure</strong></li>
-                  <li>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email</li>
-                  <li>Pour votre sécurité, ne partagez jamais ce lien</li>
-                </ul>
-              </div>
-            </div>
-            <div class="footer">
-              <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
+      html: this.getBaseTemplate(name, content)
     };
 
     try {
@@ -183,47 +239,29 @@ class EmailService {
   }
 
   async sendPasswordChangedEmail(email, name) {
+    const content = `
+      <p>Nous vous confirmons que le mot de passe associé à votre compte a été modifié avec succès.</p>
+      
+      <p>Date de modification : <strong>${new Date().toLocaleString('fr-FR')}</strong></p>
+      
+      <div class="note">
+        <p><strong>Si vous n'êtes pas à l'origine de cette modification :</strong></p>
+        <p>Veuillez <a href="${process.env.CLIENT_URL}/contact" style="color: #6e8efb;">nous contacter immédiatement</a> pour sécuriser votre compte.</p>
+      </div>
+      
+      <p>Pour des raisons de sécurité, nous vous recommandons de :</p>
+      <ul>
+        <li>Ne jamais partager votre mot de passe</li>
+        <li>Utiliser un mot de passe unique</li>
+        <li>Activer l'authentification à deux facteurs si disponible</li>
+      </ul>
+    `;
+    
     const mailOptions = {
-      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
       to: email,
       subject: 'Votre mot de passe a été modifié',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Mot de passe modifié</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-            .alert { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 15px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>✅ Mot de passe modifié</h1>
-            </div>
-            <div class="content">
-              <h2>Bonjour ${name},</h2>
-              <p>Votre mot de passe a été modifié avec succès.</p>
-              <div class="alert">
-                <p><strong>ℹ️ Information :</strong></p>
-                <p>Si vous n'êtes pas à l'origine de cette modification, contactez-nous immédiatement pour sécuriser votre compte.</p>
-              </div>
-              <p>Date de modification : ${new Date().toLocaleString('fr-FR')}</p>
-            </div>
-            <div class="footer">
-              <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
+      html: this.getBaseTemplate(name, content)
     };
 
     try {
@@ -231,7 +269,6 @@ class EmailService {
       console.log(`Email de confirmation de modification envoyé à ${email}`);
     } catch (error) {
       console.error('Erreur envoi email de confirmation:', error);
-      // Ne pas faire échouer le processus si l'email de confirmation échoue
     }
   }
 }
