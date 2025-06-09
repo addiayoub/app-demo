@@ -27,12 +27,21 @@ app.use((req, res, next) => {
 // Augmenter la limite des payloads
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',') : [''];
+
 app.use(cors({
-  origin: ['https://insightone.ma', 'https://www.insightone.ma'],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 
 app.use(morgan('dev'));
 app.use('/uploads', express.static('uploads'));
@@ -114,7 +123,10 @@ app.post('/api/admin/manual-cleanup', async (req, res) => {
   }
 });
 
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Serveur en cours d'exécution sur le port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+  console.log(`Serveur lancé sur http://${HOST}:${PORT}`);
 });
