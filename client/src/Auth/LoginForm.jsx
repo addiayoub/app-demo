@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
-import { Lock, Mail, UserPlus, Key, Loader2 } from 'lucide-react';
+import { Lock, Mail, UserPlus, Key, Loader2, Eye, EyeOff } from 'lucide-react';
 import './Login.css'
+
 const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -9,6 +10,7 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { login, loginWithGoogle, resendVerification } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -38,6 +40,10 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
     setIsLoading(false);
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
     <div id='tous_login' className="bg-gradient-to-br f flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -65,7 +71,7 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="email" 
@@ -75,18 +81,18 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
                 </label>
               </div>
               
-              {/* Password field with floating label */}
+              {/* Password field with floating label and eye icon */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <Lock className="h-5 w-5 text-indigo-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder=" "
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="password" 
@@ -94,6 +100,17 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
                 >
                   Mot de passe
                 </label>
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
               
               <button 

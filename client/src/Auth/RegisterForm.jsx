@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
-import { Mail, Lock, User, LogIn, Loader2, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, LogIn, Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import './Login.css'
 
 const RegisterForm = ({ onSwitchToLogin }) => {
@@ -12,6 +12,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register, loginWithGoogle, resendVerification } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -47,6 +49,14 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     const result = await resendVerification(userEmail);
     setMessage(result.message);
     setIsLoading(false);
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   if (emailSent) {
@@ -145,7 +155,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="name" 
@@ -166,7 +176,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="email" 
@@ -176,18 +186,18 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 </label>
               </div>
               
-              {/* Password field with floating label */}
+              {/* Password field with floating label and eye icon */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <Lock className="h-5 w-5 text-indigo-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder=" "
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="password" 
@@ -195,20 +205,31 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 >
                   Mot de passe
                 </label>
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
               
-              {/* Confirm Password field with floating label */}
+              {/* Confirm Password field with floating label and eye icon */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <ShieldCheck className="h-5 w-5 text-indigo-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   placeholder=" "
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="block px-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+                  className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
                 />
                 <label 
                   htmlFor="confirmPassword" 
@@ -216,6 +237,17 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 >
                   Confirmer le mot de passe
                 </label>
+                <button
+                  type="button"
+                  onClick={toggleConfirmPasswordVisibility}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
               
               <button 

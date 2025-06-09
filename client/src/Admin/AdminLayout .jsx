@@ -520,30 +520,7 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
 
           {/* Bottom Navigation */}
           <div className="p-4 border-t border-blue-700/50">
-            <motion.button
-              onClick={() => setActiveComponent('settings')}
-              className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
-                activeComponent === 'settings' 
-                  ? 'bg-blue-700 text-white shadow-md' 
-                  : 'hover:bg-blue-700/50 text-white/90'
-              }`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Settings size={20} className="flex-shrink-0" />
-              <AnimatePresence>
-                {(isSidebarOpen || isHovered) && (
-                  <motion.span 
-                    variants={linkVariants}
-                    initial="closed"
-                    animate={isSidebarOpen || isHovered ? "open" : "closed"}
-                    className="ml-3 whitespace-nowrap"
-                  >
-                    Paramètres
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
+           
 
             <motion.button
               onClick={logout}
