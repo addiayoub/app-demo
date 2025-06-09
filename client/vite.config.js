@@ -5,14 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    host: true, // Permet d'exposer sur le réseau
-    
-  },
-  esbuild: {
-    jsxInject: `import React from 'react'`,
-    loader: 'jsx',
-    include: /src\/.*\.js$/,
-    exclude: [],
+    host: true, 
   },
   plugins: [react(),
         tailwindcss(),
