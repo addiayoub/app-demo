@@ -96,7 +96,7 @@ const assignDashboard = async (dashboardId, expiresAt) => {
       body: JSON.stringify({
         dashboardAssignments: [{
           dashboardId,
-expiresAt: expiresAt ? `${expiresAt.getFullYear()}-${String(expiresAt.getMonth() + 1).padStart(2, '0')}-${String(expiresAt.getDate()).padStart(2, '0')}T${String(expiresAt.getHours()).padStart(2, '0')}:${String(expiresAt.getMinutes()).padStart(2, '0')}:${String(expiresAt.getSeconds()).padStart(2, '0')}` : null
+          expiresAt: expiresAt ? expiresAt.toISOString() : null,
         }],
       }),
     });
