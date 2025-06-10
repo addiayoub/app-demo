@@ -1,6 +1,7 @@
 // controllers/adminController.js
 const User = require('../models/User');
-
+const Dashboard = require('../models/Dashboard');
+const emailService = require('../services/emailService');
 const adminController = {
   // Obtenir tous les utilisateurs
   getAllUsers: async (req, res) => {
@@ -271,49 +272,154 @@ getUserDashboards: async (req, res) => {
 // Assign dashboards
 // Dans adminController.js
 assignDashboards: async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { dashboardAssignments } = req.body;
+    try {
+      const { userId } = req.params;
+      const { dashboardAssignments } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
 
-    // Supprimer les assignations existantes pour les dashboards mis à jour
-    const dashboardIdsToUpdate = dashboardAssignments.map(a => a.dashboardId);
-    user.dashboards = user.dashboards.filter(
-      d => !dashboardIdsToUpdate.includes(d.dashboard.toString())
-    );
+      // Supprimer les assignations existantes pour les dashboards mis à jour
+      const dashboardIdsToUpdate = dashboardAssignments.map(a => a.dashboardId);
+      user.dashboards = user.dashboards.filter(
+        d => !dashboardIdsToUpdate.includes(d.dashboard.toString())
+      );
 
-    // Ajouter les nouvelles assignations (conserver la chaîne de date telle quelle)
-    dashboardAssignments.forEach(assignment => {
-      user.dashboards.push({
-        dashboard: assignment.dashboardId,
-        expiresAt: assignment.expiresAt // On garde la chaîne telle quelle
+      // Ajouter les nouvelles assignations
+      dashboardAssignments.forEach(assignment => {
+        user.dashboards.push({
+          dashboard: assignment.dashboardId,
+          expiresAt: assignment.expiresAt
+        });
       });
-    });
 
-    // Désactiver la conversion automatique des dates
-    const options = { timestamps: false, strict: false };
-    await user.save(options);
-    
-    // Récupérer l'utilisateur mis à jour
-    const updatedUser = await User.findById(userId)
-      .populate('dashboards.dashboard')
-      .select('dashboards');
+      // Sauvegarder l'utilisateur
+      const options = { timestamps: false, strict: false };
+      await user.save(options);
+      
+      // Récupérer l'utilisateur mis à jour avec les détails des dashboards
+      const updatedUser = await User.findById(userId)
+        .populate('dashboards.dashboard')
+        .select('dashboards name email');
 
-    res.json({
-      message: 'Dashboards assigned successfully',
-      dashboards: updatedUser.dashboards
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      message: 'Error assigning dashboards', 
-      error: error.message 
-    });
-  }
-},
+      // Préparer les données pour l'email
+      const dashboardsForEmail = updatedUser.dashboards
+        .filter(d => dashboardIdsToUpdate.includes(d.dashboard._id.toString()))
+        .map(d => ({
+          dashboard: {
+            name: d.dashboard.name,
+            url: d.dashboard.url
+          },
+          expiresAt: d.expiresAt
+        }));
+
+      // Envoyer l'email de notification
+      try {
+        await emailService.sendDashboardAssignmentEmail(
+          user.email,
+          user.name,
+          dashboardsForEmail
+        );
+        console.log(`Email d'assignation de dashboard envoyé à ${user.email}`);
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email:', emailError);
+        // On continue même si l'email échoue, mais on log l'erreur
+      }
+
+      res.json({
+        message: 'Dashboards assigned successfully',
+        dashboards: updatedUser.dashboards,
+        emailSent: true // Indiquer que l'email a été tenté
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'assignation des dashboards:', error);
+      res.status(500).json({ 
+        message: 'Error assigning dashboards', 
+        error: error.message 
+      });
+    }
+  },
+
+  // Version alternative avec gestion d'erreur email plus robuste
+  assignDashboardsWithEmailHandling: async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { dashboardAssignments, sendEmail = true } = req.body; // Option pour désactiver l'email
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Supprimer les assignations existantes pour les dashboards mis à jour
+      const dashboardIdsToUpdate = dashboardAssignments.map(a => a.dashboardId);
+      user.dashboards = user.dashboards.filter(
+        d => !dashboardIdsToUpdate.includes(d.dashboard.toString())
+      );
+
+      // Ajouter les nouvelles assignations
+      dashboardAssignments.forEach(assignment => {
+        user.dashboards.push({
+          dashboard: assignment.dashboardId,
+          expiresAt: assignment.expiresAt
+        });
+      });
+
+      // Sauvegarder l'utilisateur
+      const options = { timestamps: false, strict: false };
+      await user.save(options);
+      
+      // Récupérer l'utilisateur mis à jour avec les détails des dashboards
+      const updatedUser = await User.findById(userId)
+        .populate('dashboards.dashboard')
+        .select('dashboards name email');
+
+      let emailSent = false;
+      
+      // Envoyer l'email seulement si demandé
+      if (sendEmail) {
+        try {
+          // Préparer les données pour l'email
+          const dashboardsForEmail = updatedUser.dashboards
+            .filter(d => dashboardIdsToUpdate.includes(d.dashboard._id.toString()))
+            .map(d => ({
+              dashboard: {
+                name: d.dashboard.name,
+                url: d.dashboard.url
+              },
+              expiresAt: d.expiresAt
+            }));
+
+          await emailService.sendDashboardAssignmentEmail(
+            user.email,
+            user.name,
+            dashboardsForEmail
+          );
+          
+          emailSent = true;
+          console.log(`Email d'assignation envoyé avec succès à ${user.email}`);
+        } catch (emailError) {
+          console.error('Erreur lors de l\'envoi de l\'email:', emailError);
+          // L'assignation continue même si l'email échoue
+        }
+      }
+
+      res.json({
+        message: 'Dashboards assigned successfully',
+        dashboards: updatedUser.dashboards,
+        emailSent: emailSent,
+        emailRequested: sendEmail
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'assignation des dashboards:', error);
+      res.status(500).json({ 
+        message: 'Error assigning dashboards', 
+        error: error.message 
+      });
+    }
+  },
 
 
 // Unassign dashboards
