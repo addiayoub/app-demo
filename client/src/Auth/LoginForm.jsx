@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { Lock, Mail, UserPlus, Key, Loader2, Eye, EyeOff } from 'lucide-react';
 import './Login.css'
-
-const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
+import { useNavigate } from 'react-router-dom';
+const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword ,onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -13,23 +13,27 @@ const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, loginWithGoogle, resendVerification } = useAuth();
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage('');
-    setNeedsVerification(false);
 
-    const result = await login(email, password);
-    setMessage(result.message);
-    setIsLoading(false);
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        if (onLoginSuccess) {
+          onLoginSuccess(); // C'est cette ligne qui va tout résoudre
+        }
+        return; // On quitte la fonction si la connexion réussit
+      }
 
-    if (result.needsVerification) {
-      setNeedsVerification(true);
-      setUnverifiedEmail(result.email);
-    }
-
-    if (!result.success) {
-      setPassword('');
+      setMessage(result.message);
+      
+    } catch (error) {
+      setMessage(error.message || "Erreur de connexion");
+    } finally {
+      setIsLoading(false);
     }
   };
 

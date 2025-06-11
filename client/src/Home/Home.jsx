@@ -109,6 +109,10 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
                 closeModal();
                 if (onLogin) onLogin();
               }}
+                onLoginSuccess={() => {
+    setShowAuthModal(false); // Ferme la modale
+    onLogin(); // Met à jour l'état d'authentification
+  }}
             />
           </>
         );
@@ -190,7 +194,7 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
                   </button>
                   <button
                     onClick={() => openModal('register')}
-                    className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 cursor-pointer hover:text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105"
+                    className="border-2 border-blue-600 text-blue-600 hover: cursor-pointer hover:text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105"
                   >
                     S'inscrire
                   </button>

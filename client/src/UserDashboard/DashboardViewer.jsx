@@ -1,40 +1,44 @@
-  import React, { useState, useEffect } from 'react';
-  import { motion, AnimatePresence } from 'framer-motion';
-  import { 
-    Clock, 
-    Search, 
-    Filter, 
-    BarChart2, 
-    ChevronDown, 
-    ChevronUp,
-    Globe,
-    Lock,
-    Eye,
-    EyeOff,
-    Calendar,
-    RotateCcw,
-    Plus,
-    LogOut,
-    Download,
-    Printer,
-    FileText,
-    FileSliders,
-    FileSignature,
-    AlertCircle,
-    Info
-  } from 'lucide-react';
-  import { useAuth } from '../Auth/AuthContext';
-  import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Clock, 
+  Search, 
+  Filter, 
+  BarChart2, 
+  ChevronDown, 
+  ChevronUp,
+  Globe,
+  Lock,
+  Eye,
+  EyeOff,
+  Calendar,
+  RotateCcw,
+  Plus,
+  LogOut,
+  Download,
+  Printer,
+  FileText,
+  FileSliders,
+  FileSignature,
+  AlertCircle,
+  Info
+} from 'lucide-react';
+import { useAuth } from '../Auth/AuthContext';
+import axios from 'axios';
 
-
- const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
+const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
 
   // Récupérer les données correctes du dashboard
+  // Pour les dashboards publics, les données sont directement sur l'objet
+  // Pour les dashboards personnels, elles peuvent être dans dashboard.data
   const dashboardData = dashboard.data || dashboard;
+
+  console.log('Dashboard in viewer:', dashboard);
+  console.log('Dashboard data:', dashboardData);
 
   useEffect(() => {
     setIsLoading(true);
@@ -44,8 +48,8 @@
       setIsLoading(false);
     }, 1000);
 
-    // Calcul du temps restant avant expiration
-    if (dashboard.expiresAt) {
+    // Calcul du temps restant avant expiration (seulement pour les dashboards assignés)
+    if (dashboard.accessType === 'assigned' && dashboard.expiresAt) {
       const updateTimeLeft = () => {
         const now = new Date();
         const expiresAt = new Date(dashboard.expiresAt);
@@ -79,7 +83,10 @@
     setIframeLoaded(true);
   };
 
-  const isExpired = dashboard.expiresAt && new Date(dashboard.expiresAt) < new Date();
+  // Les dashboards publics n'expirent pas
+  const isExpired = dashboard.accessType === 'assigned' && 
+                   dashboard.expiresAt && 
+                   new Date(dashboard.expiresAt) < new Date();
 
   return (
     <motion.div
@@ -97,6 +104,20 @@
         >
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             {dashboardData.name}
+            
+            {/* Badge pour le type d'accès */}
+            {dashboard.accessType === 'public' && (
+              <motion.span 
+                className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center gap-1"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500 }}
+              >
+                <Globe size={12} />
+                Public
+              </motion.span>
+            )}
+            
             {!dashboardData.active && (
               <motion.span 
                 className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full"
@@ -108,7 +129,8 @@
               </motion.span>
             )}
             
-            {dashboard.expiresAt && (
+            {/* Badge d'expiration seulement pour les dashboards assignés */}
+            {dashboard.accessType === 'assigned' && dashboard.expiresAt && (
               <motion.span 
                 className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                   isExpired 
@@ -269,24 +291,34 @@
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
         >
-          Assigné le {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
+          {dashboard.accessType === 'public' ? 'Dashboard public' : ''} {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
             ? new Date(dashboardData.createdAt).toLocaleDateString() 
             : 'Date invalide'}
         </motion.div>
+         <div className="p-4 bg-gray-50 flex justify-end">
+                    <img src="/ID&A TECH .png" alt="Logo" className="w-32 " />
+                  </div>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="flex items-center gap-2"
         >
-          {dashboard.expiresAt && (
+          {dashboard.accessType === 'assigned' && dashboard.expiresAt && (
             <>
               <Clock size={14} />
               {isExpired ? 'Expiré le ' : 'Expire le '}
               {new Date(dashboard.expiresAt).toLocaleDateString()}
             </>
           )}
+          {dashboard.accessType === 'public' && (
+            <>
+              <Globe size={14} />
+              Accès libre
+            </>
+          )}
         </motion.div>
+        
       </div>
     </motion.div>
   );
