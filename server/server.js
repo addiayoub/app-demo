@@ -18,6 +18,8 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboards');
 const pricingRoutes = require('./routes/pricingRoutes');
+const contactRoutes = require('./routes/contact');
+
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -77,6 +79,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboards', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pricing', pricingRoutes);
+app.use('/api', contactRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API en cours d\'exécution!' });

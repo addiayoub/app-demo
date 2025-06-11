@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const User = require('../models/User');
 
 class EmailService {
   constructor() {
@@ -272,7 +273,79 @@ class EmailService {
     }
   }
   // Ajoutez cette méthode à votre EmailService (dans le fichier EmailService.js)
+// Dans EmailService.js, ajoutez cette nouvelle méthode
+async sendContactEmail(userEmail, userName, subject, message) {
+  // Récupérer tous les admins depuis la DB
+  const adminUsers = await User.find({ role: 'admin' });
+  const adminEmails = adminUsers.map(admin => admin.email);
 
+  // Si aucun admin trouvé, utiliser une adresse de fallback depuis .env
+  const recipientEmails = adminEmails.length > 0 ? adminEmails : [process.env.ADMIN_EMAIL || process.env.FROM_EMAIL];
+
+  const content = `
+    <p>Vous avez reçu un nouveau message de contact depuis le site ${process.env.APP_NAME || 'votre plateforme'} :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #6e8efb; padding: 15px; margin: 20px 0;">
+      <p><strong>De :</strong> ${userName} (${userEmail})</p>
+      <p><strong>Sujet :</strong> ${subject}</p>
+      <p><strong>Message :</strong></p>
+      <p style="white-space: pre-line;">${message}</p>
+    </div>
+    
+    <p>Vous pouvez répondre directement à cet email ou contacter l'utilisateur à l'adresse : ${userEmail}</p>
+    
+    <div class="note">
+      <p><strong>Date d'envoi :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+    </div>
+  `;
+
+  // Email pour les admins
+  const adminMailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Contact'} - ${userName}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: recipientEmails,
+    subject: `[Contact] ${subject}`,
+    html: this.getBaseTemplate('Administrateur', content),
+    replyTo: userEmail
+  };
+
+  // Email de confirmation pour l'utilisateur
+  const userContent = `
+    <p>Merci pour votre message. Nous avons bien reçu votre demande et nous vous répondrons dans les plus brefs délais.</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #6e8efb; padding: 15px; margin: 20px 0;">
+      <p><strong>Votre message :</strong></p>
+      <p style="white-space: pre-line;">${message}</p>
+    </div>
+    
+    <p>Cordialement,<br>L'équipe ${process.env.APP_NAME || ''}</p>
+    
+    <div class="note">
+      <p><strong>Date d'envoi :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+      <p>Ceci est une confirmation automatique - merci de ne pas répondre à cet email.</p>
+    </div>
+  `;
+
+  const userMailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: userEmail,
+    subject: `Confirmation de votre message : ${subject}`,
+    html: this.getBaseTemplate(userName, userContent)
+  };
+
+  try {
+    // Envoyer les deux emails en parallèle
+    await Promise.all([
+      this.transporter.sendMail(adminMailOptions),
+      this.transporter.sendMail(userMailOptions)
+    ]);
+    
+    console.log(`Emails de contact envoyés pour ${userEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Erreur envoi emails de contact:', error);
+    throw new Error('Erreur lors de l\'envoi des emails de contact');
+  }
+}
 async sendDashboardAssignmentEmail(email, name, dashboards) {
   // Construire la liste des dashboards assignés
   const dashboardList = dashboards.map(assignment => {

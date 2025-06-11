@@ -13,6 +13,59 @@ const Home = ({ onLogin, isAuthenticated, user, onLogout, onGoToDashboard }) => 
   const [publicDashboards, setPublicDashboards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+// Dans votre composant Home, modifiez la partie contact
+const [contactForm, setContactForm] = useState({
+  name: '',
+  email: '',
+  subject: '',
+  message: ''
+});
+const [contactLoading, setContactLoading] = useState(false);
+const [contactSuccess, setContactSuccess] = useState(false);
+
+const handleContactSubmit = async (e) => {
+  e.preventDefault();
+  setContactLoading(true);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/contact`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(contactForm)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      setContactSuccess(true);
+      setContactForm({
+        name: '',
+        email: '',
+        subject: '',
+        message: ''
+      });
+      
+      // Réinitialiser le message de succès après 5 secondes
+      setTimeout(() => setContactSuccess(false), 5000);
+    } else {
+      alert(data.message || 'Erreur lors de l\'envoi du message');
+    }
+  } catch (error) {
+    alert('Erreur réseau - veuillez réessayer plus tard');
+  } finally {
+    setContactLoading(false);
+  }
+};
+
+const handleContactChange = (e) => {
+  const { name, value } = e.target;
+  setContactForm(prev => ({
+    ...prev,
+    [name]: value
+  }));
+};
 
   useEffect(() => {
     const fetchPublicDashboards = async () => {
@@ -531,54 +584,90 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
             viewport={{ once: true }}
             className="max-w-3xl mx-auto bg-gradient-to-r from-blue-50 to-purple-50 p-8 rounded-xl shadow-lg"
           >
-            <form className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                  <input 
-                    type="text" 
-                    id="name" 
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    placeholder="Votre nom"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input 
-                    type="email" 
-                    id="email" 
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    placeholder="Votre email"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Sujet</label>
-                <input 
-                  type="text" 
-                  id="subject" 
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="Sujet de votre message"
-                />
-              </div>
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                <textarea 
-                  id="message" 
-                  rows="4" 
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="Votre message"
-                ></textarea>
-              </div>
-              <div className="flex justify-center">
-                <button 
-                  type="submit"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  Envoyer le message
-                </button>
-              </div>
-            </form>
+            
+<form onSubmit={handleContactSubmit} className="space-y-6">
+  {contactSuccess && (
+    <motion.div 
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4"
+    >
+      Votre message a été envoyé avec succès !
+    </motion.div>
+  )}
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+      <input 
+        type="text" 
+        id="name" 
+        name="name"
+        value={contactForm.name}
+        onChange={handleContactChange}
+        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+        placeholder="Votre nom"
+        required
+      />
+    </div>
+    <div>
+      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input 
+        type="email" 
+        id="email" 
+        name="email"
+        value={contactForm.email}
+        onChange={handleContactChange}
+        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+        placeholder="Votre email"
+        required
+      />
+    </div>
+  </div>
+  <div>
+    <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Sujet</label>
+    <input 
+      type="text" 
+      id="subject" 
+      name="subject"
+      value={contactForm.subject}
+      onChange={handleContactChange}
+      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+      placeholder="Sujet de votre message"
+      required
+    />
+  </div>
+  <div>
+    <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+    <textarea 
+      id="message" 
+      name="message"
+      rows="4" 
+      value={contactForm.message}
+      onChange={handleContactChange}
+      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+      placeholder="Votre message"
+      required
+    ></textarea>
+  </div>
+  <div className="flex justify-center">
+    <button 
+      type="submit"
+      disabled={contactLoading}
+      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
+    >
+      {contactLoading ? (
+        <>
+          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Envoi en cours...
+        </>
+      ) : 'Envoyer le message'}
+    </button>
+  </div>
+</form>
           </motion.div>
         </div>
       </section>
