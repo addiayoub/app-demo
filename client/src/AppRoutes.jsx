@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './Auth/AuthContext';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Home from './Home/Home';
 import Dashboard from './Auth/Dashboard';
 import AdminLayout from './Admin/AdminLayout ';
@@ -9,38 +10,32 @@ import CustomLoader from './CustomLoader/CustomLoader';
 import UserDashboard from './UserDashboard/UserDashboard';
 
 const AppRoutes = () => {
-  const [currentView, setCurrentView] = useState('home');
   const { isAuthenticated, isLoading, user, logout } = useAuth();
-  const [hasCheckedUrl, setHasCheckedUrl] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [currentView, setCurrentView] = useState('home');
+  const [hasCheckedUrl, setHasCheckedUrl] = useState(false);
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
     if (hasCheckedUrl) return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    
+
     if (urlParams.get('token')) {
-      if (window.location.pathname.includes('/reset-password')) {
+      if (location.pathname.includes('/reset-password')) {
         console.log('Token détecté pour réinitialisation de mot de passe');
-        setCurrentView('reset-password');
+        navigate('/reset-password');
       } else {
         console.log('Token détecté pour vérification email');
-        setCurrentView('verify-email');
+        navigate('/verify-email');
       }
     } else if (urlParams.get('error') === 'google_auth_failed') {
       alert('Échec de l\'authentification Google. Veuillez réessayer.');
-      window.history.replaceState({}, document.title, '/');
-      setCurrentView('home');
+      navigate('/');
     }
-    
     setHasCheckedUrl(true);
-  }, [hasCheckedUrl]);
-  useEffect(() => {
-    if (!isAuthenticated && (currentView === 'admin' || currentView === 'user-dashboard')) {
-      setCurrentView('home');
-    }
-  }, [isAuthenticated, currentView]);
-  // Timer pour afficher le loader pendant 3 secondes
+  }, [location, navigate, hasCheckedUrl]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowLoader(false);
@@ -49,64 +44,55 @@ const AppRoutes = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Afficher le loader pendant 3 secondes au chargement initial
-  if (showLoader) {
-    return <CustomLoader message="Chargement..." />;
-  }
-
-  // Loading state
-  if (isLoading) {
-    return <CustomLoader message="Chargement..." />;
-  }
-
-  // Handle logout
   const handleLogout = async () => {
-  await logout(); // if logout is async
-  setCurrentView('home');
-  window.location.reload(); // optional - ensures clean state
-};
+    await logout();
+    navigate('/');
+    window.location.reload();
+  };
 
-  // Handle navigation to dashboard
   const handleGoToDashboard = () => {
-    if (user?.role === 'admin') {
-      setCurrentView('admin');
-    } else {
-      setCurrentView('user-dashboard');
+    if (isAuthenticated) {
+      if (user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/user-dashboard');
+      }
     }
   };
 
-  // Render based on current view
-  const renderCurrentView = () => {
-      if ((currentView === 'admin' || currentView === 'user-dashboard') && !isAuthenticated) {
-    return <Home onNavigate={setCurrentView} isAuthenticated={false} />;
+  if (showLoader || isLoading) {
+    return <CustomLoader message="Chargement..." />;
   }
-    
-    switch (currentView) {
-      case 'verify-email':
-        return <EmailVerification />;
-      case 'reset-password':
-        return <ResetPasswordForm onSuccess={() => setCurrentView('home')} />;
-      case 'admin':
-        return <AdminLayout onLogout={handleLogout} />;
-      case 'user-dashboard':
-        return <UserDashboard onLogout={handleLogout} />;
-      default:
-        return (
-          <Home 
-            onNavigate={setCurrentView} 
-            isAuthenticated={isAuthenticated}
-            user={user}
-            onLogout={handleLogout}
-            onGoToDashboard={handleGoToDashboard}
-          />
-        );
-    }
-  };
-
 
   return (
     <div className="App">
-      {renderCurrentView()}
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <Home 
+              onNavigate={setCurrentView} 
+              isAuthenticated={isAuthenticated}
+              user={user}
+              onLogout={handleLogout}
+              onGoToDashboard={handleGoToDashboard}
+            />
+          } 
+        />
+        <Route path="/verify-email" element={<EmailVerification />} />
+        <Route path="/reset-password" element={<ResetPasswordForm onSuccess={() => navigate('/')} />} />
+        
+        {isAuthenticated && user?.role === 'admin' && (
+          <Route path="/admin/*" element={<AdminLayout onLogout={handleLogout} />} />
+        )}
+        
+        {isAuthenticated && user?.role !== 'admin' && (
+          <Route path="/user-dashboard" element={<UserDashboard onLogout={handleLogout} />} />
+        )}
+        
+        {/* Redirection pour les routes non autorisées */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 };

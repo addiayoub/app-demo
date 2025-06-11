@@ -437,7 +437,9 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
 <motion.button
 
     // Animation de sortie avant la navigation
-    onClick={() => window.location.href = '/'} // Redirection simple vers la racine
+   onClick={() => 
+      navigate('/')
+    } // Redirection simple vers la racine
 
   whileHover={{ 
     scale: 1.1,
@@ -448,7 +450,7 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     scale: 0.9,
     transition: { duration: 0.2 }
   }}
-  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors cursor-pointer"
   title="Retour à l'accueil"
 >
   <motion.div

@@ -28,6 +28,7 @@
   import axios from 'axios';
 import DashboardViewer from './DashboardViewer';
 import EmptyState from './EmptyState';
+import { Navigate, useNavigate } from 'react-router-dom';
 
   // Composant Sidebar modifié avec animations améliorées
   const AnimatedDashboardSidebar = ({ 
@@ -45,6 +46,7 @@ import EmptyState from './EmptyState';
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [hoverTimeout, setHoverTimeout] = useState(null);
+  const navigate = useNavigate();
 
     const sidebarVariants = {
       open: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },
@@ -493,7 +495,9 @@ import EmptyState from './EmptyState';
           {/* Bouton de déconnexion */}
 <div className="p-4 border-t border-slate-700">
   <motion.button
-    onClick={() => window.location.href = '/'}
+    onClick={() => 
+      navigate('/')
+    }
     className="w-full flex items-center justify-center p-3 rounded-lg transition-all hover:bg-blue-500 cursor-pointer text-white mb-2"
     whileHover={{ scale: 1.02 }}
     whileTap={{ scale: 0.95 }}
