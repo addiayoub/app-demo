@@ -21,15 +21,15 @@ const AppRoutes = () => {
     const urlParams = new URLSearchParams(location.search);
     if (hasCheckedUrl) return;
 
-    if (urlParams.get('token')) {
-      if (location.pathname.includes('/reset-password')) {
-        console.log('Token détecté pour réinitialisation de mot de passe');
-        navigate('/reset-password');
-      } else {
-        console.log('Token détecté pour vérification email');
-        navigate('/verify-email');
-      }
-    } else if (urlParams.get('error') === 'google_auth_failed') {
+if (urlParams.get('token')) {
+  if (location.pathname.includes('/reset-password')) {
+    console.log('Token détecté pour réinitialisation de mot de passe');
+    navigate(`/reset-password?token=${urlParams.get('token')}`); // Ajoutez cette ligne
+  } else {
+    console.log('Token détecté pour vérification email');
+    navigate(`/verify-email?token=${urlParams.get('token')}`); // Ajoutez cette ligne
+  }
+}else if (urlParams.get('error') === 'google_auth_failed') {
       alert('Échec de l\'authentification Google. Veuillez réessayer.');
       navigate('/');
     }
