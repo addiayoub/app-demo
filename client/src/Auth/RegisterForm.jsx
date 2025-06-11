@@ -145,111 +145,123 @@ const RegisterForm = ({ onSwitchToLogin }) => {
           <div className="p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Name field with floating label */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <User className="h-5 w-5 text-indigo-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder=" "
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
-                />
-                <label 
-                  htmlFor="name" 
-                  className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
-                >
-                  Nom complet
-                </label>
-              </div>
-              
-              {/* Email field with floating label */}
-              <div className="relative">
-                <div className="absolute cursor-pointer inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Mail className="h-5 w-5 text-indigo-400" />
-                </div>
-                <input
-                  type="email"
-                  placeholder=" "
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
-                />
-                <label 
-                  htmlFor="email" 
-                  className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
-                >
-                  Adresse email
-                </label>
-              </div>
-              
-              {/* Password field with floating label and eye icon */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Lock className="h-5 w-5 text-indigo-400" />
-                </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder=" "
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
-                />
-                <label 
-                  htmlFor="password" 
-                  className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
-                >
-                  Mot de passe
-                </label>
-                <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-              
-              {/* Confirm Password field with floating label and eye icon */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <ShieldCheck className="h-5 w-5 text-indigo-400" />
-                </div>
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder=" "
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
-                />
-                <label 
-                  htmlFor="confirmPassword" 
-                  className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
-                >
-                  Confirmer le mot de passe
-                </label>
-                <button
-                  type="button"
-                  onClick={toggleConfirmPasswordVisibility}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-              
+             {/* Name field - Modifié */}
+<div className="relative">
+  <label 
+    htmlFor="name" 
+    className="block w-full h-full cursor-text"
+  >
+    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+      <User className="h-5 w-5 text-indigo-400" />
+    </div>
+    <input
+      id="name"
+      type="text"
+      placeholder=" "
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      required
+      className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+    />
+    <span className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3">
+      Nom complet
+    </span>
+  </label>
+</div>
+
+{/* Email field - Modifié */}
+<div className="relative">
+  <label 
+    htmlFor="email" 
+    className="block w-full h-full cursor-text"
+  >
+    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+      <Mail className="h-5 w-5 text-indigo-400" />
+    </div>
+    <input
+      id="email"
+      type="email"
+      placeholder=" "
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      required
+      className="block pl-12 pr-4 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+    />
+    <span className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3">
+      Adresse email
+    </span>
+  </label>
+</div>
+
+{/* Password field - Modifié */}
+<div className="relative">
+  <label 
+    htmlFor="password" 
+    className="block w-full h-full cursor-text"
+  >
+    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+      <Lock className="h-5 w-5 text-indigo-400" />
+    </div>
+    <input
+      id="password"
+      type={showPassword ? "text" : "password"}
+      placeholder=" "
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      required
+      className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+    />
+    <span className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3">
+      Mot de passe
+    </span>
+    <button
+      type="button"
+      onClick={togglePasswordVisibility}
+      className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
+    >
+      {showPassword ? (
+        <EyeOff className="h-5 w-5" />
+      ) : (
+        <Eye className="h-5 w-5" />
+      )}
+    </button>
+  </label>
+</div>
+
+{/* Confirm Password field - Modifié */}
+<div className="relative">
+  <label 
+    htmlFor="confirmPassword" 
+    className="block w-full h-full cursor-text"
+  >
+    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+      <ShieldCheck className="h-5 w-5 text-indigo-400" />
+    </div>
+    <input
+      id="confirmPassword"
+      type={showConfirmPassword ? "text" : "password"}
+      placeholder=" "
+      value={confirmPassword}
+      onChange={(e) => setConfirmPassword(e.target.value)}
+      required
+      className="block pl-12 pr-12 pb-2 pt-6 w-full text-gray-700 bg-white/50 rounded-lg border border-gray-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent peer"
+    />
+    <span className="absolute text-sm text-gray-500 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-12 peer-focus:left-12 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3">
+      Confirmer le mot de passe
+    </span>
+    <button
+      type="button"
+      onClick={toggleConfirmPasswordVisibility}
+      className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-400 hover:text-indigo-600 transition-colors duration-200 cursor-pointer"
+    >
+      {showConfirmPassword ? (
+        <EyeOff className="h-5 w-5" />
+      ) : (
+        <Eye className="h-5 w-5" />
+      )}
+    </button>
+  </label>
+</div>
               <button 
                 type="submit" 
                 disabled={isLoading}

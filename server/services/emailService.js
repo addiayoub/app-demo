@@ -291,9 +291,6 @@ async sendDashboardAssignmentEmail(email, name, dashboards) {
       <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; margin: 10px 0;">
         <h4 style="color: #495057; margin: 0 0 10px 0;">${dashboard.name}</h4>
         <p style="margin: 5px 0; color: #6c757d; font-size: 14px;">
-          <strong>URL :</strong> <a href="${dashboard.url}" style="color: #6e8efb; text-decoration: none;">${dashboard.url}</a>
-        </p>
-        <p style="margin: 5px 0; color: #6c757d; font-size: 14px;">
           ${expirationText}
         </p>
       </div>

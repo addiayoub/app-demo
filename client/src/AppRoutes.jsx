@@ -8,12 +8,9 @@ import ResetPasswordForm from './Auth/ResetPasswordForm';
 import CustomLoader from './CustomLoader/CustomLoader';
 import UserDashboard from './UserDashboard/UserDashboard';
 
-// Composant Loader personnalisé
-
-
 const AppRoutes = () => {
   const [currentView, setCurrentView] = useState('home');
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
   const [hasCheckedUrl, setHasCheckedUrl] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
 
@@ -38,7 +35,11 @@ const AppRoutes = () => {
     
     setHasCheckedUrl(true);
   }, [hasCheckedUrl]);
-
+  useEffect(() => {
+    if (!isAuthenticated && (currentView === 'admin' || currentView === 'user-dashboard')) {
+      setCurrentView('home');
+    }
+  }, [isAuthenticated, currentView]);
   // Timer pour afficher le loader pendant 3 secondes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -53,36 +54,59 @@ const AppRoutes = () => {
     return <CustomLoader message="Chargement..." />;
   }
 
-  // Loading state - Utilisation du loader personnalisé
+  // Loading state
   if (isLoading) {
     return <CustomLoader message="Chargement..." />;
   }
 
-  // Check if user is authenticated and user data is available
-  if (isAuthenticated && user) {
-    return user.role === 'admin' ? <AdminLayout /> : <UserDashboard />;
-  }
+  // Handle logout
+  const handleLogout = async () => {
+  await logout(); // if logout is async
+  setCurrentView('home');
+  window.location.reload(); // optional - ensures clean state
+};
 
-  // If authenticated but user data is not yet loaded, show loading
-  if (isAuthenticated && !user) {
-    return <CustomLoader message="Chargement des données utilisateur..." />;
-  }
+  // Handle navigation to dashboard
+  const handleGoToDashboard = () => {
+    if (user?.role === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('user-dashboard');
+    }
+  };
 
-  // Handle special routes (email verification, password reset)
-  const renderSpecialRoutes = () => {
+  // Render based on current view
+  const renderCurrentView = () => {
+      if ((currentView === 'admin' || currentView === 'user-dashboard') && !isAuthenticated) {
+    return <Home onNavigate={setCurrentView} isAuthenticated={false} />;
+  }
+    
     switch (currentView) {
       case 'verify-email':
         return <EmailVerification />;
       case 'reset-password':
-        return <ResetPasswordForm onSwitchToLogin={() => setCurrentView('home')} />;
+        return <ResetPasswordForm onSuccess={() => setCurrentView('home')} />;
+      case 'admin':
+        return <AdminLayout onLogout={handleLogout} />;
+      case 'user-dashboard':
+        return <UserDashboard onLogout={handleLogout} />;
       default:
-        return <Home onLogin={() => setCurrentView('home')} />;
+        return (
+          <Home 
+            onNavigate={setCurrentView} 
+            isAuthenticated={isAuthenticated}
+            user={user}
+            onLogout={handleLogout}
+            onGoToDashboard={handleGoToDashboard}
+          />
+        );
     }
   };
 
+
   return (
     <div className="App">
-      {renderSpecialRoutes()}
+      {renderCurrentView()}
     </div>
   );
 };

@@ -17,6 +17,7 @@ const app = express();
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboards');
+const pricingRoutes = require('./routes/pricingRoutes');
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -75,6 +76,7 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboards', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API en cours d\'exécution!' });

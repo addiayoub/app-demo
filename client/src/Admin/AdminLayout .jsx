@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Clock, AlertTriangle, CheckCircle, X, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -33,6 +33,8 @@ const AdminLayout = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [cleanupStats, setCleanupStats] = useState(null);
+  const navigate = useNavigate();
+const pageContentRef = useRef(null);
 
   const sidebarVariants = {
     open: { width: 250 },
@@ -428,16 +430,44 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white shadow-sm z-10">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-800">
-                {activeComponent === 'users' && 'Gestion des utilisateurs'}
-                {activeComponent === 'dashboard' && 'Tableaux de bord Power BI'}
-                {activeComponent === 'settings' && 'Paramètres'}
-                {activeComponent === 'home' && 'Tableau de bord'}
-              </h1>
-            </div>
+    <header className="bg-white shadow-sm z-10">
+  <div className="flex items-center justify-between p-4">
+    <div className="flex items-center space-x-4">
+      {/* Bouton Home animé */}
+<motion.button
+
+    // Animation de sortie avant la navigation
+    onClick={() => window.location.href = '/'} // Redirection simple vers la racine
+
+  whileHover={{ 
+    scale: 1.1,
+    rotate: 10,
+    transition: { duration: 0.3 }
+  }}
+  whileTap={{ 
+    scale: 0.9,
+    transition: { duration: 0.2 }
+  }}
+  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+  title="Retour à l'accueil"
+>
+  <motion.div
+    animate={{
+      x: [0, 2, -2, 0],
+      transition: { repeat: Infinity, duration: 3 }
+    }}
+  >
+    <Home size={20} />
+  </motion.div>
+</motion.button>
+      
+      <h1 className="text-xl font-semibold text-gray-800">
+        {activeComponent === 'users' && 'Gestion des utilisateurs'}
+        {activeComponent === 'dashboard' && 'Tableaux de bord Power BI'}
+        {activeComponent === 'settings' && 'Paramètres'}
+        {activeComponent === 'home' && 'Tableau de bord'}
+      </h1>
+    </div>
             
             <div className="flex items-center space-x-4">
             

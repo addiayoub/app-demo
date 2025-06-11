@@ -7,11 +7,12 @@ import PricingSection from './PricingSection';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const Home = ({ onLogin }) => {
+const Home = ({ onLogin, isAuthenticated, user, onLogout, onGoToDashboard }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentAuthView, setCurrentAuthView] = useState('login');
   const [publicDashboards, setPublicDashboards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   useEffect(() => {
     const fetchPublicDashboards = async () => {
@@ -45,6 +46,45 @@ const Home = ({ onLogin }) => {
   const switchAuthView = (view) => {
     setCurrentAuthView(view);
   };
+
+  // Fonction pour générer l'initiale de l'utilisateur (fallback)
+  const getUserInitial = () => {
+    if (user?.name) {
+      return user.name.charAt(0).toUpperCase();
+    }
+    return user?.email?.charAt(0).toUpperCase() || 'U';
+  };
+
+const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
+  const [imageError, setImageError] = useState(false);
+  
+  // Vérifiez si l'URL de l'avatar est valide
+  const hasValidAvatar = user?.avatar && !imageError && 
+                        (user.avatar.startsWith('http') || user.avatar.startsWith('/'));
+
+  if (hasValidAvatar) {
+    return (
+      <img
+        src={user.avatar}
+        alt={user.name || 'Avatar utilisateur'}
+        className={`${size} rounded-full object-cover shadow-md border-2 border-white`}
+        onError={() => setImageError(true)}
+        referrerPolicy="no-referrer" // Important pour les avatars Google
+      />
+    );
+  }
+  
+  // Fallback vers l'initiale si pas d'avatar ou erreur de chargement
+  if (showFallback) {
+    return (
+      <div className={`${size} bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md`}>
+        {getUserInitial()}
+      </div>
+    );
+  }
+  
+  return null;
+};
 
   const renderAuthContent = () => {
     const authHeader = (
@@ -138,20 +178,109 @@ const Home = ({ onLogin }) => {
               </div>
             </div>
 
-            {/* Auth Buttons */}
+            {/* Auth Buttons ou User Menu */}
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => openModal('login')}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 cursor-pointer hover:to-blue-800 text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-              >
-                Se connecter
-              </button>
-              <button
-                onClick={() => openModal('register')}
-                className="border-2 border-blue-600 text-blue-600 hover: cursor-pointer hover:text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105"
-              >
-                S'inscrire
-              </button>
+              {!isAuthenticated ? (
+                <>
+                  <button
+                    onClick={() => openModal('login')}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 cursor-pointer hover:to-blue-800 text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  >
+                    Se connecter
+                  </button>
+                  <button
+                    onClick={() => openModal('register')}
+                    className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 cursor-pointer hover:text-white px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105"
+                  >
+                    S'inscrire
+                  </button>
+                </>
+              ) : (
+                /* User Menu */
+                <div className="relative">
+                  <div
+                    className="flex items-center space-x-3 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200"
+                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  >
+                    {/* Avatar */}
+                    <UserAvatar />
+                    {/* User Info */}
+                    <div className="hidden md:block text-left">
+                      <p className="text-sm font-medium text-gray-900">
+                        {user?.name || 'Utilisateur'}
+                      </p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {user?.role || 'Membre'}
+                      </p>
+                    </div>
+                    {/* Dropdown Icon */}
+                    <svg 
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${showUserDropdown ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {showUserDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50"
+                    >
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <div className="flex items-center space-x-3">
+                          <UserAvatar size="w-12 h-12" />
+                          <div>
+                            <p className="font-medium text-gray-900">{user?.name || 'Utilisateur'}</p>
+                            <p className="text-sm text-gray-500">{user?.email}</p>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                              {user?.role || 'Membre'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="py-2">
+                        <button
+                          onClick={() => {
+                            onGoToDashboard();
+                            setShowUserDropdown(false);
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 cursor-pointer"
+                        >
+                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                          </svg>
+                          Mon Dashboard
+                        </button>
+                        
+                   
+                      
+
+                        <div className="border-t border-gray-100 mt-2 pt-2">
+                          <button
+                            onClick={() => {
+                              onLogout();
+                              setShowUserDropdown(false);
+                            }}
+                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 cursor-pointer"
+                          >
+                            <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                            Se déconnecter
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -167,10 +296,21 @@ const Home = ({ onLogin }) => {
               transition={{ duration: 0.8 }}
               className="text-5xl md:text-6xl font-bold text-gray-900 mb-6"
             >
-              Bienvenue sur{' '}
-              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
-                ID&A TECH-DASH 
-              </span>
+              {isAuthenticated && user ? (
+                <>
+                  Bienvenue{' '}
+                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+                    {user.name || 'sur InsightOne Dashboard'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Bienvenue sur{' '}
+                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+                    InsightOne Dashboard 
+                  </span>
+                </>
+              )}
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0 }}
@@ -178,8 +318,11 @@ const Home = ({ onLogin }) => {
               transition={{ delay: 0.3, duration: 0.8 }}
               className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed"
             >
-              Découvrez une expérience unique avec notre plateforme innovante. 
-              Connectez-vous pour accéder à toutes nos fonctionnalités exclusives.
+              {isAuthenticated && user ? (
+                `Explorez tous nos dashboards et fonctionnalités. Accédez à votre espace personnel pour gérer vos données.`
+              ) : (
+                'Découvrez une expérience unique avec notre plateforme innovante. Connectez-vous pour accéder à toutes nos fonctionnalités exclusives.'
+              )}
             </motion.p>
             <motion.div 
               initial={{ opacity: 0 }}
@@ -187,18 +330,37 @@ const Home = ({ onLogin }) => {
               transition={{ delay: 0.6, duration: 0.8 }}
               className="flex flex-col sm:flex-row gap-4 justify-center items-center"
             >
-              <button
-                onClick={() => openModal('register')}
-                className="bg-gradient-to-r cursor-pointer from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl"
-              >
-                Commencer maintenant
-              </button>
-              <button className="text-gray-700 hover:text-blue-600 px-8 py-4 rounded-full text-lg font-medium transition-colors duration-200 flex items-center">
-                En savoir plus
-                <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+              {!isAuthenticated ? (
+                <>
+                  <button
+                    onClick={() => openModal('register')}
+                    className="bg-gradient-to-r cursor-pointer from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl"
+                  >
+                    Commencer maintenant
+                  </button>
+                  <button className="text-gray-700 hover:text-blue-600 px-8 py-4 rounded-full text-lg font-medium transition-colors duration-200 flex items-center">
+                    En savoir plus
+                    <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onGoToDashboard}
+                    className="bg-gradient-to-r cursor-pointer from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl"
+                  >
+                    Accéder à mon dashboard
+                  </button>
+                  <button className="text-gray-700 hover:text-blue-600 px-8 py-4 rounded-full text-lg font-medium transition-colors duration-200 flex items-center">
+                    Explorer les dashboards publics
+                    <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </motion.div>
           </div>
         </div>
@@ -210,93 +372,80 @@ const Home = ({ onLogin }) => {
       </main>
 
       {/* Public Dashboards Section */}
-     {/* Public Dashboards Section */}
-<section id="dashboards" className="py-16 bg-white/50">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      viewport={{ once: true }}
-      className="text-center mb-12"
-    >
-      <h2 className="text-3xl font-bold text-gray-900 mb-4">Dashboards Publics</h2>
-      <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-        Explorez nos dashboards Power BI créés par notre communauté.
-      </p>
-    </motion.div>
-
-    {loading ? (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    ) : publicDashboards.length > 0 ? (
-      <div className="grid grid-cols-1 gap-8">
-        {publicDashboards.map((dashboard, index) => (
-          <motion.div
-            key={dashboard._id}
-            initial={{ opacity: 0, y: 50 }}
+      <section id="dashboards" className="py-16 bg-white/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.8 }}
+            transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            whileHover={{ scale: 1.02 }}
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
+            className="text-center mb-12"
           >
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex flex-col md:flex-row md:items-center justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{dashboard.name}</h3>
-                </div>
-          
-              </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Dashboards Publics</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Explorez nos dashboards Power BI créés par notre communauté.
+            </p>
+          </motion.div>
+
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-            
-            {/* Power BI Iframe Container */}
+          ) : publicDashboards.length > 0 ? (
+            <div className="grid grid-cols-1 gap-8">
+              {publicDashboards.map((dashboard, index) => (
+                <motion.div
+                  key={dashboard._id}
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1, duration: 0.8 }}
+                  viewport={{ once: true }}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
+                >
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between">
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{dashboard.name}</h3>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Power BI Iframe Container */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.8 }}
+                    viewport={{ once: true }}
+                    className="relative pt-[56.25%] bg-gray-100" // 16:9 aspect ratio
+                  >
+                    <iframe
+                      src={dashboard.url}
+                      className="absolute top-0 left-0 w-full h-full border-0"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </motion.div>
+                  
+                  <div className="p-4 bg-gray-50 flex justify-end">
+                    <img src="/ID&A TECH .png" alt="Logo" className="w-32 mb-4" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
             <motion.div 
               initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
-              viewport={{ once: true }}
-              className="relative pt-[56.25%] bg-gray-100" // 16:9 aspect ratio
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6 }}
+              className="text-center py-12"
             >
-              <iframe
-                src={dashboard.url}
-                className="absolute top-0 left-0 w-full h-full border-0"
-                allowFullScreen
-                loading="lazy"
-              />
-              
-           
+              <p className="text-gray-600">Aucun dashboard public disponible pour le moment.</p>
             </motion.div>
-            
-            <div className="p-4 bg-gray-50 flex justify-end">
-              <a 
-                href={dashboard.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors"
-              >
-                Ouvrir en plein écran
-                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    ) : (
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className="text-center py-12"
-      >
-        <p className="text-gray-600">Aucun dashboard public disponible pour le moment.</p>
-      </motion.div>
-    )}
-  </div>
-</section>
+          )}
+        </div>
+      </section>
+
       {/* About Section */}
       <section id="apropos" className="py-16 bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -307,7 +456,7 @@ const Home = ({ onLogin }) => {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">À propos de ID&A TECH-DASH</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">À propos de InsightOne Dashboard</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
               Notre plateforme permet de créer, partager et explorer des dashboards analytiques puissants.
             </p>

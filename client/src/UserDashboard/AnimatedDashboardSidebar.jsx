@@ -21,7 +21,8 @@
     FileSliders,
     FileSignature,
     AlertCircle,
-    Info
+    Info,
+    Home
   } from 'lucide-react';
   import { useAuth } from '../Auth/AuthContext';
   import axios from 'axios';
@@ -490,29 +491,52 @@ import EmptyState from './EmptyState';
           )}
 
           {/* Bouton de déconnexion */}
-          <div className="p-4 border-t border-slate-700">
-            <motion.button
-              onClick={logout}
-              className="w-full flex items-center justify-center p-3 rounded-lg transition-all hover:bg-red-500 cursor-pointer text-white"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <LogOut size={20} className="flex-shrink-0" />
-              <AnimatePresence>
-                {isSidebarOpen && (
-                  <motion.span 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="ml-3 whitespace-nowrap"
-                  >
-                    Déconnexion
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-          </div>
+<div className="p-4 border-t border-slate-700">
+  <motion.button
+    onClick={() => window.location.href = '/'}
+    className="w-full flex items-center justify-center p-3 rounded-lg transition-all hover:bg-blue-500 cursor-pointer text-white mb-2"
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.95 }}
+  >
+    <Home size={20} className="flex-shrink-0" />
+    <AnimatePresence>
+      {isSidebarOpen && (
+        <motion.span 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2 }}
+          className="ml-3 whitespace-nowrap"
+        >
+          Retour à l'accueil
+        </motion.span>
+      )}
+    </AnimatePresence>
+  </motion.button>
+
+  {/* Bouton de déconnexion existant */}
+  <motion.button
+    onClick={logout}
+    className="w-full flex items-center justify-center p-3 rounded-lg transition-all hover:bg-red-500 cursor-pointer text-white"
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.95 }}
+  >
+    <LogOut size={20} className="flex-shrink-0" />
+    <AnimatePresence>
+      {isSidebarOpen && (
+        <motion.span 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2 }}
+          className="ml-3 whitespace-nowrap"
+        >
+          Déconnexion
+        </motion.span>
+      )}
+    </AnimatePresence>
+  </motion.button>
+</div>
         </div>
       </motion.div>
     );
