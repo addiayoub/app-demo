@@ -8,6 +8,8 @@ const User = require('../models/User');
 
 // Route publique (SANS authentification) - doit être en premier
 router.get('/public', dashboardController.getPublicDashboards);
+router.get('/private-names', dashboardController.getPrivateDashboardNames); 
+
 router.get('/my-dashboards', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate('dashboards');

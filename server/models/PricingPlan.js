@@ -4,7 +4,6 @@ const pricingPlanSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    enum: ['Basique', 'Pro', 'Entreprise']
   },
   price: {
     type: Number,
@@ -26,7 +25,7 @@ const pricingPlanSchema = new mongoose.Schema({
   }],
   stripePriceId: {
     type: String,
-    required: true
+    required: false
   },
   isActive: {
     type: Boolean,
@@ -36,6 +35,10 @@ const pricingPlanSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  dashboards: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dashboard'
+  }],
   createdAt: {
     type: Date,
     default: Date.now

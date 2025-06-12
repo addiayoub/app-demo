@@ -4,87 +4,103 @@ import RegisterForm from '../Auth/RegisterForm';
 import ForgotPasswordForm from '../Auth/ForgotPasswordForm';
 import { motion } from 'framer-motion';
 import PricingSection from './PricingSection';
+import { LayoutDashboard } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Home = ({ onLogin, isAuthenticated, user, onLogout, onGoToDashboard }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentAuthView, setCurrentAuthView] = useState('login');
-  const [publicDashboards, setPublicDashboards] = useState([]);
+  const [dashboards, setDashboards] = useState([]);
+  const [privateDashboards, setPrivateDashboards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-// Dans votre composant Home, modifiez la partie contact
-const [contactForm, setContactForm] = useState({
-  name: '',
-  email: '',
-  subject: '',
-  message: ''
-});
-const [contactLoading, setContactLoading] = useState(false);
-const [contactSuccess, setContactSuccess] = useState(false);
+  const [selectedDashboard, setSelectedDashboard] = useState(null);
+  const [activeTab, setActiveTab] = useState('public'); // 'public' or 'private'
+  const [showPricing, setShowPricing] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
 
-const handleContactSubmit = async (e) => {
-  e.preventDefault();
-  setContactLoading(true);
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/contact`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(contactForm)
-    });
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    setContactLoading(true);
     
-    const data = await response.json();
-    
-    if (data.success) {
-      setContactSuccess(true);
-      setContactForm({
-        name: '',
-        email: '',
-        subject: '',
-        message: ''
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(contactForm)
       });
       
-      // Réinitialiser le message de succès après 5 secondes
-      setTimeout(() => setContactSuccess(false), 5000);
-    } else {
-      alert(data.message || 'Erreur lors de l\'envoi du message');
+      const data = await response.json();
+      
+      if (data.success) {
+        setContactSuccess(true);
+        setContactForm({
+          name: '',
+          email: '',
+          subject: '',
+          message: ''
+        });
+        
+        setTimeout(() => setContactSuccess(false), 5000);
+      } else {
+        alert(data.message || 'Erreur lors de l\'envoi du message');
+      }
+    } catch (error) {
+      alert('Erreur réseau - veuillez réessayer plus tard');
+    } finally {
+      setContactLoading(false);
     }
-  } catch (error) {
-    alert('Erreur réseau - veuillez réessayer plus tard');
-  } finally {
-    setContactLoading(false);
-  }
-};
+  };
 
-const handleContactChange = (e) => {
-  const { name, value } = e.target;
-  setContactForm(prev => ({
-    ...prev,
-    [name]: value
-  }));
-};
+  const handleContactChange = (e) => {
+    const { name, value } = e.target;
+    setContactForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   useEffect(() => {
-    const fetchPublicDashboards = async () => {
+    const fetchDashboards = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/dashboards/public`);
-        const data = await response.json();
-        if (data.success) {
-          // Filtrer uniquement les dashboards publics
-          const publicDashs = data.data.filter(dashboard => dashboard.isPublic);
-          setPublicDashboards(publicDashs);
+        setLoading(true);
+        
+        // Fetch public dashboards
+        const publicResponse = await fetch(`${API_BASE_URL}/api/dashboards/public`);
+        const publicData = await publicResponse.json();
+        
+        // Fetch private dashboard names
+        const privateResponse = await fetch(`${API_BASE_URL}/api/dashboards/private-names`);
+        const privateData = await privateResponse.json();
+        
+        if (publicData.success && privateData.success) {
+          const publicDashs = publicData.data.filter(dashboard => dashboard.isPublic);
+          setDashboards(publicDashs);
+          setPrivateDashboards(privateData.data);
+          
+          // Select first public dashboard by default
+          if (publicDashs.length > 0) {
+            setSelectedDashboard(publicDashs[0]);
+          }
         }
       } catch (error) {
-        console.error('Error fetching public dashboards:', error);
+        console.error('Error fetching dashboards:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPublicDashboards();
+    fetchDashboards();
   }, []);
 
   const openModal = (view = 'login') => {
@@ -100,7 +116,6 @@ const handleContactChange = (e) => {
     setCurrentAuthView(view);
   };
 
-  // Fonction pour générer l'initiale de l'utilisateur (fallback)
   const getUserInitial = () => {
     if (user?.name) {
       return user.name.charAt(0).toUpperCase();
@@ -108,36 +123,34 @@ const handleContactChange = (e) => {
     return user?.email?.charAt(0).toUpperCase() || 'U';
   };
 
-const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
-  const [imageError, setImageError] = useState(false);
-  
-  // Vérifiez si l'URL de l'avatar est valide
-  const hasValidAvatar = user?.avatar && !imageError && 
-                        (user.avatar.startsWith('http') || user.avatar.startsWith('/'));
+  const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    const hasValidAvatar = user?.avatar && !imageError && 
+                          (user.avatar.startsWith('http') || user.avatar.startsWith('/'));
 
-  if (hasValidAvatar) {
-    return (
-      <img
-        src={user.avatar}
-        alt={user.name || 'Avatar utilisateur'}
-        className={`${size} rounded-full object-cover shadow-md border-2 border-white`}
-        onError={() => setImageError(true)}
-        referrerPolicy="no-referrer" // Important pour les avatars Google
-      />
-    );
-  }
-  
-  // Fallback vers l'initiale si pas d'avatar ou erreur de chargement
-  if (showFallback) {
-    return (
-      <div className={`${size} bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md`}>
-        {getUserInitial()}
-      </div>
-    );
-  }
-  
-  return null;
-};
+    if (hasValidAvatar) {
+      return (
+        <img
+          src={user.avatar}
+          alt={user.name || 'Avatar utilisateur'}
+          className={`${size} rounded-full object-cover shadow-md border-2 border-white`}
+          onError={() => setImageError(true)}
+          referrerPolicy="no-referrer"
+        />
+      );
+    }
+    
+    if (showFallback) {
+      return (
+        <div className={`${size} bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md`}>
+          {getUserInitial()}
+        </div>
+      );
+    }
+    
+    return null;
+  };
 
   const renderAuthContent = () => {
     const authHeader = (
@@ -162,10 +175,10 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
                 closeModal();
                 if (onLogin) onLogin();
               }}
-                onLoginSuccess={() => {
-    setShowAuthModal(false); // Ferme la modale
-    onLogin(); // Met à jour l'état d'authentification
-  }}
+              onLoginSuccess={() => {
+                setShowAuthModal(false);
+                onLogin();
+              }}
             />
           </>
         );
@@ -316,9 +329,6 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
                           Mon Dashboard
                         </button>
                         
-                   
-                      
-
                         <div className="border-t border-gray-100 mt-2 pt-2">
                           <button
                             onClick={() => {
@@ -428,80 +438,200 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
         <div className="absolute bottom-20 left-1/4 w-16 h-16 bg-pink-400/20 rounded-full blur-xl"></div>
       </main>
 
-      {/* Public Dashboards Section */}
-      <section id="dashboards" className="py-16 bg-white/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Dashboards Publics</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Explorez nos dashboards Power BI créés par notre communauté.
-            </p>
-          </motion.div>
+      {/* Dashboards Section with Sidebar */}
+ <section id="dashboards" className="py-16 bg-white/50 ">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      viewport={{ once: true }}
+      className="text-center mb-12"
+    >
+      <h2 className="text-3xl font-bold text-gray-900 mb-4">Explorez nos Dashboards</h2>
+      <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        Découvrez tous nos dashboards Power BI. Cliquez sur un dashboard pour y accéder.
+      </p>
+    </motion.div>
 
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : publicDashboards.length > 0 ? (
-            <div className="grid grid-cols-1 gap-8">
-              {publicDashboards.map((dashboard, index) => (
-                <motion.div
-                  key={dashboard._id}
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1, duration: 0.8 }}
-                  viewport={{ once: true }}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
-                >
-                  <div className="p-6 border-b border-gray-200">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{dashboard.name}</h3>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Sidebar Navigation - Tous les dashboards */}
+      <div className="lg:col-span-1">
+        <div className="bg-white rounded-xl shadow-md overflow-hidden sticky top-6">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Tous les Les tableaux de bord</h3>
+            <p className="text-sm text-gray-500 mt-1">
+            </p>
+          </div>
+          
+          <div className="p-2 max-h-96 lg:max-h-[500px] overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {/* Dashboards publics */}
+                {dashboards.map((dashboard) => (
+                  <li key={dashboard._id}>
+                    <button
+                      onClick={() => {
+                        setSelectedDashboard(dashboard);
+                        setShowPricing(false);
+                      }}
+                      className={`w-full text-left px-3 py-3 cursor-pointer rounded-lg transition-all duration-200 text-sm ${
+                        selectedDashboard?._id === dashboard._id && !showPricing
+                          ? 'bg-green-100 text-green-800 shadow-sm border-l-4 border-green-500' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center cursor-pointer justify-between">
+                        <div className="flex items-center">
+                          <LayoutDashboard className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="font-medium line-clamp-2">{dashboard.name}</span>
+                        </div>
                       </div>
-                    </div>
+                    </button>
+                  </li>
+                ))}
+
+                {/* Dashboards privés */}
+                {privateDashboards.map((dashboard) => (
+                  <li key={dashboard._id}>
+                    <button
+                      onClick={() => {
+                        setSelectedDashboard(dashboard);
+                        setShowPricing(true);
+                      }}
+                      className={`w-full text-left px-3 py-3 cursor-pointer rounded-lg transition-all duration-200 text-sm ${
+                        selectedDashboard?._id === dashboard._id && showPricing
+                          ? 'bg-blue-100 text-blue-800 shadow-sm border-l-4 border-blue-500' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <LayoutDashboard className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="font-medium line-clamp-2">{dashboard.name}</span>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+
+                {/* Message si aucun dashboard */}
+                {dashboards.length === 0 && privateDashboards.length === 0 && (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    Aucun dashboard disponible
                   </div>
-                  
-                  {/* Power BI Iframe Container */}
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    transition={{ delay: 0.3, duration: 0.8 }}
-                    viewport={{ once: true }}
-                    className="relative pt-[56.25%] bg-gray-100" // 16:9 aspect ratio
-                  >
-                    <iframe
-                      src={dashboard.url}
-                      className="absolute top-0 left-0 w-full h-full border-0"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </motion.div>
-                  
-                  <div className="p-4 bg-gray-50 flex justify-end">
-                    <img src="/ID&A TECH .png" alt="Logo" className="w-32 mb-4" />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6 }}
-              className="text-center py-12"
-            >
-              <p className="text-gray-600">Aucun dashboard public disponible pour le moment.</p>
-            </motion.div>
-          )}
+                )}
+              </ul>
+            )}
+          </div>
         </div>
-      </section>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="lg:col-span-3">
+        
+        {loading ? (
+          <div className="flex justify-center items-center py-12 bg-white rounded-2xl shadow-md">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : showPricing ? (
+          /* Affichage du pricing pour les dashboards privés */
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+           
+            
+            {/* Pricing Section */}
+        <div className="p-4 lg:p-6">
+  <div className="flex items-center justify-between mb-4">
+    <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+      <LayoutDashboard className="inline-block mr-2 w-6 h-6 text-gray-700" />
+      {selectedDashboard?.name}
+    </h1>
+    <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
+  </div>
+
+  <PricingSection />
+</div>
+
+            
+            <div className="p-3 lg:p-4 bg-gray-50 flex justify-between items-center">
+              <div className="text-xs text-gray-500">
+                Dashboard privé • ID&A TECH
+              </div>
+              <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
+            </div>
+          </motion.div>
+        ) : selectedDashboard ? (
+          /* Affichage du dashboard public */
+          <motion.div
+            key={selectedDashboard._id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="p-4 lg:p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3 mb-2">
+                <LayoutDashboard className="w-6 h-6 text-gray-700" />
+                <div>
+                  <h3 className="text-xl lg:text-2xl font-bold text-gray-900">
+                    {selectedDashboard.name}
+                  </h3>
+                </div>
+              </div>
+              
+              {selectedDashboard.description && (
+                <p className="text-gray-600 text-sm lg:text-base">
+                  {selectedDashboard.description}
+                </p>
+              )}
+            </div>
+            
+            {/* Power BI Iframe Container */}
+            <div className="relative aspect-video bg-gray-100">
+              <iframe
+                src={selectedDashboard.url}
+                className="absolute inset-0 w-full h-full border-0"
+                allowFullScreen
+                loading="lazy"
+                title={`Dashboard ${selectedDashboard.name}`}
+              />
+            </div>
+            
+            <div className="p-3 lg:p-4 bg-gray-50 flex justify-between items-center">
+              <div className="text-xs text-gray-500">
+                Dashboard public • ID&A TECH
+              </div>
+              <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
+            </div>
+          </motion.div>
+        ) : (
+          /* État initial - aucun dashboard sélectionné */
+          <div className="bg-white rounded-2xl shadow-lg p-8 lg:p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <LayoutDashboard className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sélectionnez un dashboard</h3>
+              <p className="text-gray-500 text-sm">
+                Choisissez un dashboard dans la liste de gauche pour l'afficher ou voir les options d'abonnement.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</section>
+     
 
       {/* About Section */}
       <section id="apropos" className="py-16 bg-gradient-to-br from-blue-50 to-purple-50">
@@ -559,8 +689,8 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
           </div>
         </div>
       </section>
-      <PricingSection />
-
+      <br />
+ <PricingSection />
       {/* Contact Section */}
       <section id="contact" className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -584,90 +714,89 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
             viewport={{ once: true }}
             className="max-w-3xl mx-auto bg-gradient-to-r from-blue-50 to-purple-50 p-8 rounded-xl shadow-lg"
           >
-            
-<form onSubmit={handleContactSubmit} className="space-y-6">
-  {contactSuccess && (
-    <motion.div 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4"
-    >
-      Votre message a été envoyé avec succès !
-    </motion.div>
-  )}
-  
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div>
-      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-      <input 
-        type="text" 
-        id="name" 
-        name="name"
-        value={contactForm.name}
-        onChange={handleContactChange}
-        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder="Votre nom"
-        required
-      />
-    </div>
-    <div>
-      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-      <input 
-        type="email" 
-        id="email" 
-        name="email"
-        value={contactForm.email}
-        onChange={handleContactChange}
-        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder="Votre email"
-        required
-      />
-    </div>
-  </div>
-  <div>
-    <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Sujet</label>
-    <input 
-      type="text" 
-      id="subject" 
-      name="subject"
-      value={contactForm.subject}
-      onChange={handleContactChange}
-      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-      placeholder="Sujet de votre message"
-      required
-    />
-  </div>
-  <div>
-    <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-    <textarea 
-      id="message" 
-      name="message"
-      rows="4" 
-      value={contactForm.message}
-      onChange={handleContactChange}
-      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-      placeholder="Votre message"
-      required
-    ></textarea>
-  </div>
-  <div className="flex justify-center">
-    <button 
-      type="submit"
-      disabled={contactLoading}
-      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
-    >
-      {contactLoading ? (
-        <>
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Envoi en cours...
-        </>
-      ) : 'Envoyer le message'}
-    </button>
-  </div>
-</form>
+            <form onSubmit={handleContactSubmit} className="space-y-6">
+              {contactSuccess && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4"
+                >
+                  Votre message a été envoyé avec succès !
+                </motion.div>
+              )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                  <input 
+                    type="text" 
+                    id="name" 
+                    name="name"
+                    value={contactForm.name}
+                    onChange={handleContactChange}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    placeholder="Votre nom"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    id="email" 
+                    name="email"
+                    value={contactForm.email}
+                    onChange={handleContactChange}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    placeholder="Votre email"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Sujet</label>
+                <input 
+                  type="text" 
+                  id="subject" 
+                  name="subject"
+                  value={contactForm.subject}
+                  onChange={handleContactChange}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="Sujet de votre message"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea 
+                  id="message" 
+                  name="message"
+                  rows="4" 
+                  value={contactForm.message}
+                  onChange={handleContactChange}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="Votre message"
+                  required
+                ></textarea>
+              </div>
+              <div className="flex justify-center">
+                <button 
+                  type="submit"
+                  disabled={contactLoading}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-full text-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {contactLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Envoi en cours...
+                    </>
+                  ) : 'Envoyer le message'}
+                </button>
+              </div>
+            </form>
           </motion.div>
         </div>
       </section>
@@ -677,13 +806,14 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <img src="/ID&A TECH .png" alt="Logo" className="w-32 mb-4" />
+              <a href="https://idatech.ma/"><img src="/ID&A TECH .png" alt="Logo" className="w-32 mb-4" /></a>
+              
               <p className="text-gray-400">
                 Plateforme de dashboards analytiques pour transformer vos données en insights.
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold mb-4">Navigation</h3>
+              <h3 className="text-lg font-semibold mb-4">Navigation</h3>  
               <ul className="space-y-2">
                 <li><a href="#accueil" className="text-gray-400 hover:text-white transition-colors">Accueil</a></li>
                 <li><a href="#dashboards" className="text-gray-400 hover:text-white transition-colors">Dashboards</a></li>
@@ -712,8 +842,7 @@ const UserAvatar = ({ size = "w-10 h-10", showFallback = true }) => {
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
-                  +123 456 7890
-                </li>
++212 5 20 07 60 75                </li>
               </ul>
             </div>
           </div>

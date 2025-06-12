@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCheck, FaCrown, FaRocket, FaLightbulb, FaGem, FaStar } from 'react-icons/fa';
+import { FaCheck, FaCrown, FaRocket, FaLightbulb, FaGem, FaStar, FaSyncAlt } from 'react-icons/fa';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getPlans, createSubscription, getUserSubscription } from '../services/pricingService';
@@ -80,7 +80,7 @@ const CheckoutForm = ({ plan, onSuccess, onClose }) => {
         <motion.button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 cursor-pointer hover:bg-gray-50"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -100,32 +100,64 @@ const CheckoutForm = ({ plan, onSuccess, onClose }) => {
   );
 };
 
-const PricingCard = ({ plan, isRecommended, userSubscription, onSubscribe }) => {
+const PlanBadge = ({ isRecommended, isPopular, isBestValue }) => {
+  if (!isRecommended && !isPopular && !isBestValue) return null;
+
+  let text = '';
+  let bgClass = '';
+  let icon = null;
+
+  if (isRecommended) {
+    text = 'Recommandé';
+    bgClass = 'from-purple-600 to-blue-600';
+    icon = <FaStar className="mr-1" />;
+  } else if (isPopular) {
+    text = 'Populaire';
+    bgClass = 'from-pink-600 to-red-600';
+    icon = <FaRocket className="mr-1" />;
+  } else if (isBestValue) {
+    text = 'Meilleur rapport';
+    bgClass = 'from-green-600 to-teal-600';
+    icon = <FaGem className="mr-1" />;
+  }
+
+  return (
+    <motion.div 
+      className={`absolute top-4 right-4 bg-gradient-to-r ${bgClass} text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center`}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
+    >
+      {icon}
+      <span>{text}</span>
+    </motion.div>
+  );
+};
+
+const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscription, onSubscribe }) => {
   const [showCheckout, setShowCheckout] = useState(false);
   const isCurrentPlan = userSubscription?.plan?._id === plan._id;
   const isSubscribed = userSubscription && userSubscription.status === 'active';
 
+  // Calculate yearly savings if monthly plan exists
+  const yearlySavings = plan.billingCycle === 'yearly' 
+  ? `Économisez ${Math.round((1 - (plan.price / (plan.price * 12))) * 100)}%` 
+  : null;
+
   return (
     <motion.div 
       className={`relative rounded-2xl overflow-hidden border-2 ${
-        isRecommended ? 'border-purple-500 shadow-xl' : 'border-gray-200'
+        isRecommended ? 'border-purple-500 shadow-xl' : 
+        isPopular ? 'border-pink-500 shadow-xl' :
+        isBestValue ? 'border-green-500 shadow-xl' :
+        'border-gray-200'
       } bg-white hover:shadow-2xl transition-all duration-300 h-full flex flex-col`}
       whileHover={{ y: -5 }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      {isRecommended && (
-        <motion.div 
-          className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
-        >
-          <FaStar className="mr-1" />
-          <span>Recommandé</span>
-        </motion.div>
-      )}
+      <PlanBadge isRecommended={isRecommended} isPopular={isPopular} isBestValue={isBestValue} />
 
       <div className="p-8 flex flex-col flex-grow">
         <div className="w-14 h-14 flex items-center justify-center bg-gradient-to-br from-white to-gray-100 rounded-xl shadow-sm mb-6 text-3xl">
@@ -136,14 +168,40 @@ const PricingCard = ({ plan, isRecommended, userSubscription, onSubscribe }) => 
 
         <h3 className="text-3xl font-bold text-gray-900 mb-2">{plan.name}</h3>
         
-        <div className="flex items-end mb-6">
+        <div className="flex items-end mb-2">
           <span className="text-5xl font-extrabold text-gray-900">{plan.price}</span>
-          <span className="text-gray-500 ml-2 mb-1 text-xl">{plan.currency}/mois</span>
+          <span className="text-gray-500 ml-2 mb-1 text-xl">{plan.currency}/{plan.billingCycle === 'monthly' ? 'mois' : 'an'}</span>
         </div>
+
+        {yearlySavings && (
+          <motion.div 
+            className="text-sm text-green-600 mb-4 font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            {yearlySavings}
+          </motion.div>
+        )}
         
         <p className="text-gray-600 mb-8 text-lg">{plan.description}</p>
         
-        <ul className="space-y-4 mb-8 flex-grow">
+        <div className="mb-4">
+          <h4 className="font-semibold text-gray-800 mb-2">Dashboards inclus :</h4>
+          <div className="flex flex-wrap gap-2">
+            {plan.dashboards.map((db, i) => (
+              <motion.span
+                key={i}
+                className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
+                whileHover={{ scale: 1.05 }}
+              >
+                {db.name}
+              </motion.span>
+            ))}
+          </div>
+        </div>
+        
+        <ul className="space-y-4 mb-8 flex-grow cursor-pointer">
           {plan.features.map((feature, i) => (
             <motion.li 
               key={i} 
@@ -178,10 +236,14 @@ const PricingCard = ({ plan, isRecommended, userSubscription, onSubscribe }) => 
               <motion.button
                 onClick={() => setShowCheckout(true)}
                 disabled={isCurrentPlan}
-                className={`w-full ${
+                className={`w-full cursor-pointer ${
                   isRecommended 
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700' 
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                    : isPopular
+                      ? 'bg-gradient-to-r from-pink-600 to-red-600 hover:from-pink-700 hover:to-red-700'
+                      : isBestValue
+                        ? 'bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700'
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
                 } text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:hover:shadow-lg text-lg`}
                 whileHover={isCurrentPlan ? {} : { scale: 1.02 }}
                 whileTap={isCurrentPlan ? {} : { scale: 0.98 }}
@@ -207,6 +269,7 @@ const PricingSection = () => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userSubscription, setUserSubscription] = useState(null);
+  const [billingCycle, setBillingCycle] = useState('monthly');
   const { isAuthenticated, token } = useAuth();
 
   useEffect(() => {
@@ -242,70 +305,159 @@ const PricingSection = () => {
     }
   };
 
+  const filteredPlans = plans.filter(plan => plan.billingCycle === billingCycle);
+
+  const toggleBillingCycle = () => {
+    setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly');
+  };
+
   if (loading) {
     return <CustomLoader/>;
   }
 
   return (
-    <section id="pricing" className="py-20 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <section id="pricing" className="bg-gradient-to-b from-white to-blue-50">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        viewport={{ once: true }}
+        className="text-center mb-16"
+      >
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
+          className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-6 shadow-sm"
+          whileHover={{ scale: 1.05 }}
         >
-          <motion.div 
-            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-6 shadow-sm"
-            whileHover={{ scale: 1.05 }}
-          >
-            <FaGem className="text-blue-600 mr-3 text-xl" />
-            <span className="text-blue-800 font-medium text-lg">Nos offres premium</span>
-          </motion.div>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Des tarifs adaptés à votre croissance</h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Choisissez le plan qui correspond à vos besoins. Changez de plan à tout moment.
-          </p>
+          <FaGem className="text-blue-600 mr-3 text-xl" />
+          <span className="text-blue-800 font-medium text-lg">Nos offres premium</span>
         </motion.div>
+        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Des tarifs adaptés à votre croissance</h2>
+        <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          Choisissez le plan qui correspond à vos besoins. Changez de plan à tout moment.
+        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-stretch">
-          {plans.map((plan, index) => (
-            <PricingCard 
-              key={plan._id}
-              plan={plan} 
-              isRecommended={plan.name === 'Pro'}
-              userSubscription={userSubscription}
-              onSubscribe={handleSubscriptionSuccess}
-            />
-          ))}
-        </div>
-
+        {/* Billing Cycle Toggle */}
         <motion.div 
+          className="flex justify-center items-center mt-8 cursor-pointer"
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          viewport={{ once: true }}
-          className="mt-20 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-10 shadow-inner border border-blue-100"
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
         >
-          <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-3xl font-bold text-gray-900 mb-6">Besoin d'une solution sur mesure ?</h3>
-            <p className="text-gray-700 mb-8 text-lg leading-relaxed">
-              Nous proposons des solutions personnalisées pour les entreprises avec des besoins spécifiques. 
-              Contactez-nous pour discuter de vos exigences et obtenir une offre adaptée.
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
-              whileTap={{ scale: 0.98 }}
-              className="bg-gradient-to-r from-gray-800 to-gray-900 text-white font-medium py-4 px-10 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl text-lg"
+          <motion.span 
+            className={`mr-4 font-medium ${billingCycle === 'monthly' ? 'text-blue-600' : 'text-gray-500'}`}
+            animate={{ 
+              color: billingCycle === 'monthly' ? '#2563eb' : '#6b7280',
+              x: billingCycle === 'monthly' ? 0 : -5
+            }}
+            transition={{ type: 'spring', stiffness: 500 }}
+          >
+            Mensuel
+          </motion.span>
+          
+          <motion.button
+            onClick={toggleBillingCycle}
+            className="relative inline-flex items-center h-8 rounded-full w-16 bg-gradient-to-r from-blue-500 to-purple-500 shadow-md cursor-pointer transition-all duration-300"
+            whileTap={{ scale: 0.95 }}
+          >
+            <motion.span
+              className={`absolute inline-flex items-center justify-center w-6 h-6 bg-white rounded-full shadow-md ${
+                billingCycle === 'monthly' ? 'left-1' : 'left-9'
+              }`}
+              animate={{
+                left: billingCycle === 'monthly' ? 4 : 36,
+              }}
+              transition={{ 
+                type: 'spring', 
+                stiffness: 700, 
+                damping: 30,
+                duration: 0.3
+              }}
             >
-              Contactez notre équipe
-            </motion.button>
-          </div>
+              <FaSyncAlt 
+                className={`text-xs ${
+                  billingCycle === 'monthly' ? 'text-blue-500' : 'text-purple-500'
+                }`}
+                animate={{
+                  rotate: billingCycle === 'monthly' ? 0 : 180,
+                }}
+                transition={{ duration: 0.3 }}
+              />
+            </motion.span>
+          </motion.button>
+          
+          <motion.span 
+            className={`ml-4 font-medium ${billingCycle === 'yearly' ? 'text-purple-600' : 'text-gray-500'}`}
+            animate={{ 
+              color: billingCycle === 'yearly' ? '#7c3aed' : '#6b7280',
+              x: billingCycle === 'yearly' ? 0 : 5
+            }}
+            transition={{ type: 'spring', stiffness: 500 }}
+          >
+            Annuel
+          </motion.span>
         </motion.div>
-      </div>
-    </section>
-  );
+      </motion.div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={billingCycle}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.5 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-10 items-stretch"
+        >
+          {filteredPlans.map((plan, index) => (
+            <motion.div
+              key={plan._id}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                delay: index * 0.15,
+                type: "spring",
+                stiffness: 100,
+                damping: 15
+              }}
+            >
+              <PricingCard 
+                plan={plan} 
+                isRecommended={plan.name === 'Pro' && plan.billingCycle === 'monthly'}
+                isPopular={plan.name === 'Entreprise' && plan.billingCycle === 'monthly'}
+                isBestValue={plan.name === 'Pro' && plan.billingCycle === 'yearly'}
+                userSubscription={userSubscription}
+                onSubscribe={handleSubscriptionSuccess}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
+      </AnimatePresence>
+
+      <motion.div 
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ delay: 0.4, duration: 0.6 }}
+        viewport={{ once: true }}
+        className="mt-20 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-10 shadow-inner border border-blue-100"
+      >
+        <div className="max-w-4xl mx-auto text-center">
+          <h3 className="text-3xl font-bold text-gray-900 mb-6">Besoin d'une solution sur mesure ?</h3>
+          <p className="text-gray-700 mb-8 text-lg leading-relaxed">
+            Nous proposons des solutions personnalisées pour les entreprises avec des besoins spécifiques. 
+            Contactez-nous pour discuter de vos exigences et obtenir une offre adaptée.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+            whileTap={{ scale: 0.98 }}
+            className="bg-gradient-to-r cursor-pointer from-gray-800 to-gray-900 text-white font-medium py-4 px-10 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl text-lg"
+          >
+            Contactez notre équipe
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  </section>
+);
 };
 
 export default PricingSection;

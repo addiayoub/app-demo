@@ -13,7 +13,8 @@ import {
   LogOut,
   Plus,
   ChevronDown,
-  LineChart
+  LineChart,
+  CreditCard
 } from 'lucide-react';
 import User_admin from './User_admin';
 import PowerBIDashboard from './PowerBIDashboard';
@@ -21,6 +22,7 @@ import { useAuth } from '../Auth/AuthContext';
 import axios from 'axios';
 
 import NotificationBell from './NotificationBell';
+import PricingAdmin from './PricingAdmin';
 const AdminLayout = () => {
   const [activeComponent, setActiveComponent] = useState('users');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -245,187 +247,208 @@ useEffect(() => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-      <motion.div
-        initial="open"
-        animate={isSidebarOpen ? "open" : "closed"}
-        whileHover={!isSidebarOpen ? "hover" : ""}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        variants={sidebarVariants}
+    {/* Sidebar */}
+<motion.div
+  initial="open"
+  animate={isSidebarOpen ? "open" : "closed"}
+  whileHover={!isSidebarOpen ? "hover" : ""}
+  onMouseEnter={() => setIsHovered(true)}
+  onMouseLeave={() => setIsHovered(false)}
+  variants={sidebarVariants}
+  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+  className={`cursor-pointer bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-xl relative z-20`}
+>
+  <div className="flex flex-col h-full">
+    {/* Logo */}
+    <div className="p-5 flex items-center justify-between">
+      <AnimatePresence mode="wait">
+        {(isSidebarOpen || isHovered) ? (
+          <motion.div 
+            key="logo-open"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center"
+          >
+            <img src="/ID&A TECH .png" alt="Logo" className="w-50" />
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="logo-closed"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center"
+          >
+            <img src="/ID&A TECH1 .png" alt="Logo" className="w-15" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
 
-transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className={` cursor-pointer bg-gradient-to-b from-slate-900 to-slate-800  text-white  shadow-xl relative z-20`}>
-        
-      
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-5 flex items-center justify-between">
-            <AnimatePresence mode="wait">
-              {(isSidebarOpen || isHovered) ? (
-                <motion.div 
-                  key="logo-open"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center"
+    {/* Navigation */}
+    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <motion.button
+        onClick={() => setActiveComponent('users')}
+        className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
+          activeComponent === 'users' 
+            ? 'bg-blue-700 text-white shadow-md' 
+            : 'hover:bg-blue-700/50 text-white/90'
+        }`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <Users size={20} className="flex-shrink-0" />
+        <AnimatePresence>
+          {(isSidebarOpen || isHovered) && (
+            <motion.span 
+              variants={linkVariants}
+              initial="closed"
+              animate={isSidebarOpen || isHovered ? "open" : "closed"}
+              className="ml-3 whitespace-nowrap"
+            >
+              Utilisateurs
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+<motion.button
+  onClick={() => setActiveComponent('pricing')}
+  className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
+    activeComponent === 'pricing' 
+      ? 'bg-blue-700 text-white shadow-md' 
+      : 'hover:bg-blue-700/50 text-white/90'
+  }`}
+  whileHover={{ scale: 1.02 }}
+  whileTap={{ scale: 0.98 }}
+>
+  <CreditCard size={20} className="flex-shrink-0" />
+  <AnimatePresence>
+    {(isSidebarOpen || isHovered) && (
+      <motion.span 
+        variants={linkVariants}
+        initial="closed"
+        animate={isSidebarOpen || isHovered ? "open" : "closed"}
+        className="ml-3 whitespace-nowrap"
+      >
+        Plans Tarifaires
+      </motion.span>
+    )}
+  </AnimatePresence>
+</motion.button>
+      <div className="space-y-1">
+        <motion.button
+          onClick={() => setDashboardsMenuOpen(!dashboardsMenuOpen)}
+          className={`cursor-pointer w-full flex items-center justify-between p-3 rounded-lg transition-all ${
+            activeComponent === 'dashboard' 
+              ? 'bg-blue-700 text-white shadow-md' 
+              : 'hover:bg-blue-700/50 text-white/90'
+          }`}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="flex items-center">
+            <LayoutDashboard size={20} className="flex-shrink-0" />
+            <AnimatePresence>
+              {(isSidebarOpen || isHovered) && (
+                <motion.span 
+                  variants={linkVariants}
+                  initial="closed"
+                  animate={isSidebarOpen || isHovered ? "open" : "closed"}
+                  className="ml-3 whitespace-nowrap"
                 >
-                  <img src="/ID&A TECH .png" alt="Logo" className="w-50" />
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="logo-closed"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center"
-                >
-                  <img src="/ID&A TECH1 .png" alt="Logo" className="w-15" />
-                </motion.div>
+                  Tableaux de bord
+                </motion.span>
               )}
             </AnimatePresence>
           </div>
+          {(isSidebarOpen || isHovered) && (
+            dashboardsMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+          )}
+        </motion.button>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            <motion.button
-              onClick={() => setActiveComponent('users')}
-              className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
-                activeComponent === 'users' 
-                  ? 'bg-blue-700 text-white shadow-md' 
-                  : 'hover:bg-blue-700/50 text-white/90'
-              }`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+        <AnimatePresence>
+          {dashboardsMenuOpen && (isSidebarOpen || isHovered) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="ml-8 pl-2 border-l-2 border-blue-600/30 space-y-1"
             >
-              <Users size={20} className="flex-shrink-0" />
-              <AnimatePresence>
-                {(isSidebarOpen || isHovered) && (
-                  <motion.span 
-                    variants={linkVariants}
-                    initial="closed"
-                    animate={isSidebarOpen || isHovered ? "open" : "closed"}
-                    className="ml-3 whitespace-nowrap"
-                  >
-                    Utilisateurs
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
+              {dashboards.map((dashboard) => (
+                <motion.button
+                  key={dashboard._id}
+                  onClick={() => {
+                    setActiveComponent('dashboard');
+                    setSelectedDashboard(dashboard);
+                  }}
+                  className={`cursor-pointer w-full flex items-center justify-between p-2 rounded-lg transition-all text-sm ${
+                    selectedDashboard?._id === dashboard._id
+                      ? 'bg-blue-600/20 text-white' 
+                      : 'hover:bg-blue-700/20 text-white/80'
+                  }`}
+                  whileHover={{ x: 5 }}
+                  title={dashboard.name} // Tooltip pour afficher le nom complet
+                >
+                  <div className="flex items-center min-w-0 flex-1">
+                    <BarChart2 size={16} className="flex-shrink-0" />
+                    <span className="ml-2 text-left overflow-hidden text-ellipsis whitespace-nowrap">
+                      {dashboard.name}
+                    </span>
+                  </div>
+                  {!dashboard.active && (
+                    <span className="text-xs text-red-300 ml-2 flex-shrink-0">(inactif)</span>
+                  )}
+                </motion.button>
+              ))}
+              
+              {user?.role === 'admin' && (
+                <motion.button
+                  onClick={() => {
+                    setActiveComponent('dashboard');
+                    setSelectedDashboard(null);
+                  }}
+                  className="w-full flex items-center p-2 rounded-lg transition-all text-sm hover:bg-blue-700/20 text-white/80"
+                  whileHover={{ x: 5 }}
+                >
+                  <Plus size={16} className="flex-shrink-0" />
+                  <span className="ml-2 whitespace-nowrap">Ajouter un dashboard</span>
+                </motion.button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </nav>
 
-            <div className="space-y-1">
-              <motion.button
-                onClick={() => setDashboardsMenuOpen(!dashboardsMenuOpen)}
-                className={`cursor-pointer w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                  activeComponent === 'dashboard' 
-                    ? 'bg-blue-700 text-white shadow-md' 
-                    : 'hover:bg-blue-700/50 text-white/90'
-                }`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="flex items-center">
-                  <LayoutDashboard size={20} className="flex-shrink-0" />
-                  <AnimatePresence>
-                    {(isSidebarOpen || isHovered) && (
-                      <motion.span 
-                        variants={linkVariants}
-                        initial="closed"
-                        animate={isSidebarOpen || isHovered ? "open" : "closed"}
-                        className="ml-3 whitespace-nowrap"
-                      >
-                        Tableaux de bord
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </div>
-                {(isSidebarOpen || isHovered) && (
-                  dashboardsMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
-                )}
-              </motion.button>
-
-              <AnimatePresence>
-                {dashboardsMenuOpen && (isSidebarOpen || isHovered) && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="ml-8 pl-2 border-l-2 border-blue-600/30 space-y-1"
-                  >
-                    {dashboards.map((dashboard) => (
-                      <motion.button
-                        key={dashboard._id}
-                        onClick={() => {
-                          setActiveComponent('dashboard');
-                          setSelectedDashboard(dashboard);
-                        }}
-                        className={`cursor-pointer w-full flex items-center justify-between p-2 rounded-lg transition-all text-sm ${
-                          selectedDashboard?._id === dashboard._id
-                            ? 'bg-blue-600/20 text-white' 
-                            : 'hover:bg-blue-700/20 text-white/80'
-                        }`}
-                        whileHover={{ x: 5 }}
-                      >
-                        <div className="flex items-center">
-                          <BarChart2 size={16} className="flex-shrink-0" />
-                          <span className="ml-2 whitespace-nowrap truncate max-w-[150px]">
-                            {dashboard.name}
-                          </span>
-                        </div>
-                        {!dashboard.active && (
-                          <span className="text-xs text-red-300 ml-2">(inactif)</span>
-                        )}
-                      </motion.button>
-                    ))}
-                    
-                    {user?.role === 'admin' && (
-                      <motion.button
-                        onClick={() => {
-                          setActiveComponent('dashboard');
-                          setSelectedDashboard(null);
-                        }}
-                        className="w-full flex items-center p-2 rounded-lg transition-all text-sm hover:bg-blue-700/20 text-white/80"
-                        whileHover={{ x: 5 }}
-                      >
-                        <Plus size={16} className="flex-shrink-0" />
-                        <span className="ml-2 whitespace-nowrap">Ajouter un dashboard</span>
-                      </motion.button>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </nav>
-
-          {/* Bottom Navigation */}
-          <div className="p-4 border-t border-blue-700/50">
-           
-
-            <motion.button
-              onClick={logout}
-              className="w-full flex items-center p-3 rounded-lg transition-all hover:bg-red-500 cursor-pointer text-white/90 mt-2"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+    {/* Bottom Navigation */}
+    <div className="p-4 border-t border-blue-700/50">
+      <motion.button
+        onClick={logout}
+        className="w-full flex items-center p-3 rounded-lg transition-all hover:bg-red-500 cursor-pointer text-white/90 mt-2"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <LogOut size={20} className="flex-shrink-0" />
+        <AnimatePresence>
+          {(isSidebarOpen || isHovered) && (
+            <motion.span 
+              variants={linkVariants}
+              initial="closed"
+              animate={isSidebarOpen || isHovered ? "open" : "closed"}
+              className="ml-3 whitespace-nowrap"
             >
-              <LogOut size={20} className="flex-shrink-0" />
-              <AnimatePresence>
-                {(isSidebarOpen || isHovered) && (
-                  <motion.span 
-                    variants={linkVariants}
-                    initial="closed"
-                    animate={isSidebarOpen || isHovered ? "open" : "closed"}
-                    className="ml-3 whitespace-nowrap"
-                  >
-                    Déconnexion
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
+              Déconnexion
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+    </div>
+  </div>
+</motion.div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -465,6 +488,7 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       
       <h1 className="text-xl font-semibold text-gray-800">
         {activeComponent === 'users' && 'Gestion des utilisateurs'}
+        {activeComponent === 'pricing' && 'Plans tarifaires'}
         {activeComponent === 'dashboard' && 'Tableaux de bord Power BI'}
         {activeComponent === 'settings' && 'Paramètres'}
         {activeComponent === 'home' && 'Tableau de bord'}
@@ -513,6 +537,8 @@ transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
               {activeComponent === 'users' ? (
                 <User_admin />
+              ) : activeComponent === 'pricing' ? (
+                <PricingAdmin/>
               ) : activeComponent === 'dashboard' ? (
                 <PowerBIDashboard 
                   isAdmin={user?.role === 'admin'} 

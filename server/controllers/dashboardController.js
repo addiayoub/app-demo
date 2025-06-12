@@ -33,6 +33,28 @@
       });
     }
   },
+  // Nouvelle méthode pour obtenir uniquement les noms des dashboards non publics
+getPrivateDashboardNames: async (req, res) => {
+  try {
+    const dashboards = await Dashboard.find({ 
+      isPublic: false,
+      active: true // Seulement les dashboards actifs
+    })
+    .select('name _id') // Seulement le nom et l'ID
+    .sort({ updatedAt: -1 });
+    
+    res.json({
+      success: true,
+      data: dashboards
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des noms de dashboards privés',
+      error: error.message
+    });
+  }
+},
   getPublicDashboards: async (req, res) => {
     try {
       const dashboards = await Dashboard.find({ 

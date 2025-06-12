@@ -1,11 +1,14 @@
 const PricingPlan = require('../models/PricingPlan');
 const Subscription = require('../models/Subscription');
 const User = require('../models/User');
+const Dashboard = require('../models/Dashboard');
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.getPlans = async (req, res) => {
   try {
-    const plans = await PricingPlan.find({ isActive: true }).sort('order');
+    const plans = await PricingPlan.find({ isActive: true })
+      .populate('dashboards', 'name _id') // Populate dashboard names and IDs
+      .sort('order');
     res.json({ success: true, plans });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -18,7 +21,7 @@ exports.createSubscription = async (req, res) => {
     const userId = req.user._id;
 
     // 1. Get the plan
-    const plan = await PricingPlan.findById(planId);
+    const plan = await PricingPlan.findById(planId).populate('dashboards');
     if (!plan) {
       return res.status(404).json({ success: false, error: 'Plan not found' });
     }
@@ -75,7 +78,8 @@ exports.createSubscription = async (req, res) => {
       stripeSubscriptionId: mockSubscription.id,
       status: mockSubscription.status,
       currentPeriodStart: new Date(mockSubscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(mockSubscription.current_period_end * 1000)
+      currentPeriodEnd: new Date(mockSubscription.current_period_end * 1000),
+      dashboards: plan.dashboards.map(d => d._id) // Assign dashboards from the plan
     });
     await newSubscription.save();
 
@@ -85,6 +89,8 @@ exports.createSubscription = async (req, res) => {
     } else if (plan.name === 'Entreprise') {
       user.role = 'enterprise';
     }
+    // Assign dashboards to user
+    user.allowedDashboards = [...new Set([...user.allowedDashboards, ...plan.dashboards.map(d => d._id)])];
     await user.save();
 
     res.json({
@@ -125,8 +131,9 @@ exports.cancelSubscription = async (req, res) => {
     subscription.status = 'canceled';
     await subscription.save();
 
-    // Downgrade user role
+    // Downgrade user role and remove assigned dashboards
     user.role = 'user';
+    user.allowedDashboards = [];
     await user.save();
 
     res.json({ 
@@ -141,7 +148,13 @@ exports.cancelSubscription = async (req, res) => {
 exports.getUserSubscription = async (req, res) => {
   try {
     const subscription = await Subscription.findOne({ user: req.user._id })
-      .populate('plan')
+      .populate({
+        path: 'plan',
+        populate: {
+          path: 'dashboards',
+          select: 'name _id'
+        }
+      })
       .sort({ createdAt: -1 });
 
     if (!subscription) {
@@ -179,6 +192,149 @@ exports.createPortalSession = async (req, res) => {
       success: false 
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+// Créer un nouveau plan
+
+exports.createPlan = async (req, res) => {
+  try {
+    const { name, price, currency, billingCycle, features, dashboards, isActive } = req.body;
+
+    // Validation de base
+    if (!name || !price || !billingCycle) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Name, price, and billing cycle are required' 
+      });
+    }
+
+    // Vérifier si le nom existe déjà
+    const existingPlan = await PricingPlan.findOne({ name });
+    if (existingPlan) {
+      return res.status(400).json({
+        success: false,
+        error: 'A plan with this name already exists'
+      });
+    }
+
+    // Auto-générer l'ordre si non fourni
+    if (!req.body.order) {
+      const highestOrderPlan = await PricingPlan.findOne()
+        .sort('-order')
+        .select('order');
+      req.body.order = highestOrderPlan ? highestOrderPlan.order + 1 : 1;
+    }
+
+    // Créer le plan
+    const newPlan = new PricingPlan({
+      name,
+      price,
+      currency: currency || 'MAD',
+      billingCycle,
+      features: features || [],
+      dashboards: dashboards || [],
+      isActive: isActive !== undefined ? isActive : true,
+      order: req.body.order,
+      stripePriceId: req.body.stripePriceId || `mock_price_${Date.now()}`
+    });
+
+    await newPlan.save();
+
+    res.status(201).json({ 
+      success: true, 
+      plan: newPlan 
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+};
+// Mettre à jour un plan
+exports.updatePlan = async (req, res) => {
+  try {
+    const plan = await PricingPlan.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    ).populate('dashboards', 'name _id');
+    
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Plan not found' });
+    }
+    
+    res.json({ success: true, plan });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Supprimer un plan
+exports.deletePlan = async (req, res) => {
+  try {
+    const plan = await PricingPlan.findByIdAndDelete(req.params.id);
+    
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Plan not found' });
+    }
+    
+    // Supprimer les références dans les abonnements
+    await Subscription.deleteMany({ plan: req.params.id });
+    
+    res.json({ success: true, message: 'Plan deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+// New method to assign dashboards to a pricing plan
+exports.assignDashboardsToPlan = async (req, res) => {
+  try {
+    const { planId } = req.params;
+    const { dashboardIds } = req.body;
+
+    // Verify plan exists
+    const plan = await PricingPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Plan not found' });
+    }
+
+    // Verify all dashboard IDs exist and are active
+    const dashboards = await Dashboard.find({
+      _id: { $in: dashboardIds },
+      active: true
+    });
+    if (dashboards.length !== dashboardIds.length) {
+      return res.status(400).json({ success: false, error: 'Some dashboards are invalid or inactive' });
+    }
+
+    // Assign dashboards to plan
+    plan.dashboards = dashboardIds;
+    await plan.save();
+
+    // Update existing subscriptions to reflect new dashboards
+    const subscriptions = await Subscription.find({ plan: planId, status: 'active' });
+    for (const subscription of subscriptions) {
+      subscription.dashboards = dashboardIds;
+      await subscription.save();
+
+      // Update user allowedDashboards
+      const user = await User.findById(subscription.user);
+      if (user) {
+        user.allowedDashboards = [...new Set([...user.allowedDashboards, ...dashboardIds])];
+        await user.save();
+      }
+    }
+
+    const updatedPlan = await PricingPlan.findById(planId).populate('dashboards', 'name _id');
+    res.json({
+      success: true,
+      message: 'Dashboards assigned to plan successfully',
+      plan: updatedPlan
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };

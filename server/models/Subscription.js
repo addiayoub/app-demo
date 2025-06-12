@@ -28,10 +28,10 @@ const subscriptionSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  cancelAtPeriodEnd: {
-    type: Boolean,
-    default: false
-  },
+  dashboards: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dashboard'
+  }],
   createdAt: {
     type: Date,
     default: Date.now
