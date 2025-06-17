@@ -11,7 +11,7 @@ import {
   Save,
   ArrowLeft,
   Check,
-  ChevronLeft,
+  ChevronDown,
   ChevronRight
 } from 'lucide-react';
 import axios from 'axios';
@@ -21,8 +21,11 @@ import { FaCheck, FaCrown, FaRocket, FaLightbulb, FaGem, FaStar, FaSyncAlt } fro
 const PricingAdmin = () => {
   const [plans, setPlans] = useState([]);
   const [dashboards, setDashboards] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [editingPlan, setEditingPlan] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [searchCategory, setSearchCategory] = useState('');
+const [expandedCategories, setExpandedCategories] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     price: 0,
@@ -32,7 +35,10 @@ const PricingAdmin = () => {
     isActive: true,
     order: 0,
     dashboards: [],
-    description: ''
+    description: '',
+    isRecommended: false,
+    isPopular: false,
+    isBestValue: false
   });
   const [newFeature, setNewFeature] = useState('');
   const [billingCycleView, setBillingCycleView] = useState('monthly');
@@ -41,11 +47,16 @@ const PricingAdmin = () => {
     fetchPlans();
     fetchDashboards();
   }, []);
-
+const toggleCategoryExpansion = (categoryId) => {
+  setExpandedCategories(prev => ({
+    ...prev,
+    [categoryId]: !prev[categoryId]
+  }));
+};
   const fetchPlans = async () => {
     try {
       const res = await axios.get('/api/pricing/plans');
-      setPlans(res.data.plans);
+      setPlans(res.data.plans || []);
     } catch (err) {
       toast.error('Erreur lors du chargement des plans');
     }
@@ -53,29 +64,44 @@ const PricingAdmin = () => {
 
   const fetchDashboards = async () => {
     try {
-      const res = await axios.get('/api/dashboards');
-      setDashboards(res.data.data || res.data);
+      const [dashboardsRes, categoriesRes] = await Promise.all([
+        axios.get('/api/dashboards'),
+        axios.get('/api/categories')
+      ]);
+      
+      // Handle different response structures more safely
+      const dashboardsData = dashboardsRes.data?.data || dashboardsRes.data || [];
+      const categoriesData = categoriesRes.data?.data || categoriesRes.data || [];
+      
+      // Ensure we always have arrays
+      setDashboards(Array.isArray(dashboardsData) ? dashboardsData : []);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (err) {
-      toast.error('Erreur lors du chargement des dashboards');
+      console.error('Error fetching data:', err);
+      toast.error('Erreur lors du chargement des données');
+      // Set empty arrays as fallback
+      setDashboards([]);
+      setCategories([]);
     }
   };
-const handleEdit = (plan) => {
-  setEditingPlan(plan._id);
-  setFormData({
-    name: plan.name,
-    price: plan.price,
-    currency: plan.currency,
-    billingCycle: plan.billingCycle,
-    features: [...plan.features],
-    isActive: plan.isActive,
-    order: plan.order,
-    dashboards: plan.dashboards?.map(db => typeof db === 'object' ? db._id : db) || [],
-    description: plan.description || '',
-    isRecommended: plan.isRecommended || false,
-    isPopular: plan.isPopular || false,
-    isBestValue: plan.isBestValue || false
-  });
-};
+
+  const handleEdit = (plan) => {
+    setEditingPlan(plan._id);
+    setFormData({
+      name: plan.name,
+      price: plan.price,
+      currency: plan.currency,
+      billingCycle: plan.billingCycle,
+      features: [...plan.features],
+      isActive: plan.isActive,
+      order: plan.order,
+      dashboards: plan.dashboards?.map(db => typeof db === 'object' ? db._id : db) || [],
+      description: plan.description || '',
+      isRecommended: plan.isRecommended || false,
+      isPopular: plan.isPopular || false,
+      isBestValue: plan.isBestValue || false
+    });
+  };
 
   const handleCreateNew = () => {
     setIsCreating(true);
@@ -89,7 +115,10 @@ const handleEdit = (plan) => {
       isActive: true,
       order: plans.length > 0 ? Math.max(...plans.map(p => p.order)) + 1 : 0,
       dashboards: [],
-      description: ''
+      description: '',
+      isRecommended: false,
+      isPopular: false,
+      isBestValue: false
     });
   };
 
@@ -173,39 +202,39 @@ const handleEdit = (plan) => {
     setBillingCycleView(prev => prev === 'monthly' ? 'yearly' : 'monthly');
   };
 
-const PlanBadge = ({ plan }) => {
-  if (!plan.isRecommended && !plan.isPopular && !plan.isBestValue) return null;
+  const PlanBadge = ({ plan }) => {
+    if (!plan.isRecommended && !plan.isPopular && !plan.isBestValue) return null;
 
-  let text = '';
-  let bgClass = '';
-  let icon = null;
+    let text = '';
+    let bgClass = '';
+    let icon = null;
 
-  if (plan.isRecommended) {
-    text = 'Recommandé';
-    bgClass = 'from-purple-600 to-blue-600';
-    icon = <FaStar className="mr-1" />;
-  } else if (plan.isPopular) {
-    text = 'Populaire';
-    bgClass = 'from-pink-600 to-red-600';
-    icon = <FaRocket className="mr-1" />;
-  } else if (plan.isBestValue) {
-    text = 'Meilleur rapport';
-    bgClass = 'from-green-600 to-teal-600';
-    icon = <FaGem className="mr-1" />;
-  }
+    if (plan.isRecommended) {
+      text = 'Recommandé';
+      bgClass = 'from-purple-600 to-blue-600';
+      icon = <FaStar className="mr-1" />;
+    } else if (plan.isPopular) {
+      text = 'Populaire';
+      bgClass = 'from-pink-600 to-red-600';
+      icon = <FaRocket className="mr-1" />;
+    } else if (plan.isBestValue) {
+      text = 'Meilleur rapport';
+      bgClass = 'from-green-600 to-teal-600';
+      icon = <FaGem className="mr-1" />;
+    }
 
-  return (
-    <motion.div 
-      className={`absolute top-4 right-4 bg-gradient-to-r ${bgClass} text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center z-10`}
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
-    >
-      {icon}
-      <span>{text}</span>
-    </motion.div>
-  );
-};
+    return (
+      <motion.div 
+        className={`absolute top-4 right-4 bg-gradient-to-r ${bgClass} text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center z-10`}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
+      >
+        {icon}
+        <span>{text}</span>
+      </motion.div>
+    );
+  };
 
   const filteredPlans = plans.filter(plan => plan.billingCycle === billingCycleView);
 
@@ -224,7 +253,6 @@ const PlanBadge = ({ plan }) => {
           </motion.h2>
           
           <div className="flex items-center space-x-4">
-            {/* Billing Cycle Toggle */}
             <motion.div 
               className="flex items-center cursor-pointer"
               initial={{ opacity: 0 }}
@@ -353,37 +381,39 @@ const PlanBadge = ({ plan }) => {
                     required
                   />
                 </motion.div>
-<motion.div>
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <label className="flex items-center space-x-2">
-    <input
-      type="checkbox"
-      checked={formData.isRecommended || false}
-      onChange={() => setFormData({...formData, isRecommended: !formData.isRecommended})}
-      className="rounded text-indigo-600 focus:ring-indigo-500"
-    />
-    <span>Recommandé</span>
-  </label>
-  <label className="flex items-center space-x-2">
-    <input
-      type="checkbox"
-      checked={formData.isPopular || false}
-      onChange={() => setFormData({...formData, isPopular: !formData.isPopular})}
-      className="rounded text-indigo-600 focus:ring-indigo-500"
-    />
-    <span>Populaire</span>
-  </label>
-  <label className="flex items-center space-x-2">
-    <input
-      type="checkbox"
-      checked={formData.isBestValue || false}
-      onChange={() => setFormData({...formData, isBestValue: !formData.isBestValue})}
-      className="rounded text-indigo-600 focus:ring-indigo-500"
-    />
-    <span>Meilleur rapport</span>
-  </label>
-</div>
-</motion.div>
+
+                <motion.div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isRecommended || false}
+                        onChange={() => setFormData({...formData, isRecommended: !formData.isRecommended})}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Recommandé</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isPopular || false}
+                        onChange={() => setFormData({...formData, isPopular: !formData.isPopular})}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Populaire</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isBestValue || false}
+                        onChange={() => setFormData({...formData, isBestValue: !formData.isBestValue})}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Meilleur rapport</span>
+                    </label>
+                  </div>
+                </motion.div>
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -533,50 +563,207 @@ const PlanBadge = ({ plan }) => {
                   ))}
                 </div>
               </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                className="space-y-4"
-              >
-                <label className="block text-sm font-medium text-gray-700">
-                  Dashboards inclus ({formData.dashboards.length} sélectionnés)
-                </label>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {dashboards.map(dashboard => (
-  <motion.div
-    key={dashboard._id}
-    whileHover={{ y: -2 }}
-    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-      formData.dashboards.includes(dashboard._id) 
-        ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-100' 
-        : 'bg-white border-gray-200 hover:bg-gray-50'
-    }`}
-    onClick={() => handleDashboardToggle(dashboard._id)}
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.35 }}
+  className="space-y-4"
+>
+  <label className="block text-sm font-medium text-gray-700">
+    Dashboards inclus ({formData.dashboards.length} sélectionnés)
+  </label>
+  
+  {/* Barre de recherche des catégories */}
+  <motion.div 
+    className="flex rounded-lg overflow-hidden shadow-sm mb-4"
+    whileHover={{ scale: 1.005 }}
   >
-    <div className="flex items-center">
-      <div className={`w-5 h-5 rounded flex items-center justify-center mr-3 ${
-        formData.dashboards.includes(dashboard._id) 
-          ? 'bg-indigo-600 text-white' 
-          : 'border border-gray-300'
-      }`}>
-        {formData.dashboards.includes(dashboard._id) && (
-          <Check size={14} />
-        )}
-      </div>
-      <div>
-        <p className="font-medium text-gray-800">{dashboard.name}</p>
-        {!dashboard.active && (
-          <p className="text-xs text-red-500 mt-1">Dashboard inactif</p>
-        )}
-      </div>
-    </div>
+    <input
+      type="text"
+      value={searchCategory}
+      onChange={(e) => setSearchCategory(e.target.value)}
+      placeholder="Rechercher une catégorie..."
+      className="flex-1 p-3 border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+    />
   </motion.div>
-))}
+  
+  <div className="space-y-6">
+    {categories
+      .filter(category => 
+        category.name.toLowerCase().includes(searchCategory.toLowerCase())
+      )
+      .map(category => {
+        const categoryDashboards = dashboards.filter(dashboard => 
+          dashboard.categories?.some(cat => 
+            typeof cat === 'object' ? cat._id === category._id : cat === category._id
+          )
+        );
+        
+        if (categoryDashboards.length === 0) return null;
+        
+        const isExpanded = expandedCategories[category._id] !== false; // Par défaut étendu
+        
+        return (
+          <motion.div 
+            key={category._id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gray-50 p-4 rounded-lg"
+          >
+            <div 
+              className="flex justify-between items-center cursor-pointer"
+              onClick={() => toggleCategoryExpansion(category._id)}
+            >
+              <h4 className="font-semibold text-gray-800 flex items-center">
+                <span className="w-3 h-3 rounded-full bg-indigo-500 mr-2"></span>
+                {category.name}
+                <span className="ml-2 text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full">
+                  {categoryDashboards.length} dashboard{categoryDashboards.length > 1 ? 's' : ''}
+                </span>
+              </h4>
+              <motion.div
+                animate={{ rotate: isExpanded ? 0 : -90 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown size={20} className="text-gray-500" />
+              </motion.div>
+            </div>
+            
+            <AnimatePresence>
+              {isExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {categoryDashboards.map(dashboard => (
+                      <motion.div
+                        key={dashboard._id}
+                        whileHover={{ y: -2 }}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                          formData.dashboards.includes(dashboard._id) 
+                            ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-100' 
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleDashboardToggle(dashboard._id)}
+                      >
+                        <div className="flex items-center">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center mr-3 ${
+                            formData.dashboards.includes(dashboard._id) 
+                              ? 'bg-indigo-600 text-white' 
+                              : 'border border-gray-300'
+                          }`}>
+                            {formData.dashboards.includes(dashboard._id) && (
+                              <Check size={14} />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">{dashboard.name}</p>
+                            {!dashboard.active && (
+                              <p className="text-xs text-red-500 mt-1">Dashboard inactif</p>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
+      })}
+    
+    {/* Section pour les dashboards sans catégorie */}
+    {(() => {
+      const uncategorizedDashboards = dashboards.filter(dashboard => 
+        !dashboard.categories || dashboard.categories.length === 0
+      );
+      
+      if (uncategorizedDashboards.length === 0) return null;
+      
+      const isExpanded = expandedCategories['uncategorized'] !== false;
+      
+      return (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gray-50 p-4 rounded-lg"
+        >
+          <div 
+            className="flex justify-between items-center cursor-pointer"
+            onClick={() => toggleCategoryExpansion('uncategorized')}
+          >
+            <h4 className="font-semibold text-gray-800 flex items-center">
+              <span className="w-3 h-3 rounded-full bg-gray-500 mr-2"></span>
+              Sans catégorie
+              <span className="ml-2 text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
+                {uncategorizedDashboards.length} dashboard{uncategorizedDashboards.length > 1 ? 's' : ''}
+              </span>
+            </h4>
+            <motion.div
+              animate={{ rotate: isExpanded ? 0 : -90 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown size={20} className="text-gray-500" />
+            </motion.div>
+          </div>
+          
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  {uncategorizedDashboards.map(dashboard => (
+                    <motion.div
+                      key={dashboard._id}
+                      whileHover={{ y: -2 }}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                        formData.dashboards.includes(dashboard._id) 
+                          ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-100' 
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleDashboardToggle(dashboard._id)}
+                    >
+                      <div className="flex items-center">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center mr-3 ${
+                          formData.dashboards.includes(dashboard._id) 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'border border-gray-300'
+                        }`}>
+                          {formData.dashboards.includes(dashboard._id) && (
+                            <Check size={14} />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{dashboard.name}</p>
+                          {!dashboard.active && (
+                            <p className="text-xs text-red-500 mt-1">Dashboard inactif</p>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      );
+    })()}
+  </div>
+</motion.div>
+             
 
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -655,12 +842,12 @@ const PlanBadge = ({ plan }) => {
                 >
                   <motion.div 
                     whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
-                 className={`relative rounded-2xl overflow-hidden border-2 ${
-  plan.isRecommended ? 'border-blue-500 shadow-xl' : 
-  plan.isPopular ? 'border-purple-500 shadow-xl' :
-  plan.isBestValue ? 'border-green-500 shadow-xl' :
-  'border-gray-200'
-} bg-white transition-all duration-300 h-full flex flex-col`}
+                    className={`relative rounded-2xl overflow-hidden border-2 ${
+                      plan.isRecommended ? 'border-blue-500 shadow-xl' : 
+                      plan.isPopular ? 'border-purple-500 shadow-xl' :
+                      plan.isBestValue ? 'border-green-500 shadow-xl' :
+                      'border-gray-200'
+                    } bg-white transition-all duration-300 h-full flex flex-col`}
                   >
                     {!plan.isActive && (
                       <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full z-10">
@@ -668,14 +855,7 @@ const PlanBadge = ({ plan }) => {
                       </div>
                     )}
 
-               <PlanBadge 
-  plan={plan} 
-  // Remplacez ces valeurs par les propriétés réelles de votre plan
-  isRecommended={plan.isRecommended} 
-  isPopular={plan.isPopular}
-  isBestValue={plan.isBestValue}
-/>
-
+                    <PlanBadge plan={plan} />
 
                     <div className="p-8 flex flex-col flex-grow">
                       <div className="w-14 h-14 flex items-center justify-center bg-gradient-to-br from-white to-gray-100 rounded-xl shadow-sm mb-6 text-3xl">
@@ -683,7 +863,6 @@ const PlanBadge = ({ plan }) => {
                         {plan.name === 'Pro' && <FaRocket className="text-blue-500" />}
                         {plan.name === 'Entreprise' && <FaCrown className="text-purple-500" />}
                         {plan.name === 'Premium' && <FaGem className="text-green-500" />}
-                        
                       </div>
 
                       <h3 className="text-3xl font-bold text-gray-900 mb-2">{plan.name}</h3>
@@ -708,20 +887,86 @@ const PlanBadge = ({ plan }) => {
                         <p className="text-gray-600 mb-6 text-lg">{plan.description}</p>
                       )}
                       
-                     <div className="mb-4">
+
+<div className="mb-4">
   <h4 className="font-semibold text-gray-800 mb-2">Dashboards inclus :</h4>
-  <div className="flex flex-wrap gap-2">
-    {plan.dashboards?.map((dashboard, i) => (
-      <motion.span
-        key={i}
-        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-        whileHover={{ scale: 1.05 }}
-      >
-        {dashboard.name}
-      </motion.span>
-    ))}
+  <div className="space-y-3">
+    {categories
+      .filter(category => {
+        // Vérifier si au moins un dashboard de cette catégorie est inclus dans le plan
+        return plan.dashboards?.some(planDashboard => {
+          // Si c'est un objet avec _id
+          const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+          
+          // Trouver le dashboard complet
+          const fullDashboard = dashboards.find(db => db._id === dashboardId);
+          
+          // Vérifier si ce dashboard appartient à cette catégorie
+          return fullDashboard?.categories?.some(cat => {
+            const categoryId = typeof cat === 'object' ? cat._id : cat;
+            return categoryId === category._id;
+          });
+        });
+      })
+      .map(category => {
+        // Compter le nombre de dashboards dans cette catégorie
+        const count = plan.dashboards?.filter(planDashboard => {
+          const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+          const fullDashboard = dashboards.find(db => db._id === dashboardId);
+          
+          return fullDashboard?.categories?.some(cat => {
+            const categoryId = typeof cat === 'object' ? cat._id : cat;
+            return categoryId === category._id;
+          });
+        }).length || 0;
+
+        return (
+          <div key={category._id} className="flex items-center text-sm text-gray-600">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 mr-2"></span>
+            {category.name} <span className="ml-1 text-gray-500">({count})</span>
+          </div>
+        );
+      })}
+    
+    {/* Afficher les dashboards sans catégorie seulement s'il y en a */}
+    {(() => {
+      const uncategorizedDashboards = plan.dashboards?.filter(planDashboard => {
+        const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+        const fullDashboard = dashboards.find(db => db._id === dashboardId);
+        
+
+        return !fullDashboard?.categories || fullDashboard.categories.length === 0;
+      }) || [];
+      
+      if (uncategorizedDashboards.length === 0) return null;
+
+      return (
+        <div className="flex items-center text-sm text-gray-600">
+          <span className="w-2 h-2 rounded-full bg-gray-500 mr-2"></span>
+          Sans catégorie <span className="ml-1 text-gray-500">({uncategorizedDashboards.length})</span>
+        </div>
+      );
+    })()}
+    
+    {/* Afficher le total si aucune catégorie n'est trouvée */}
+    {categories.filter(category => {
+      return plan.dashboards?.some(planDashboard => {
+        const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+        const fullDashboard = dashboards.find(db => db._id === dashboardId);
+        return fullDashboard?.categories?.some(cat => {
+          const categoryId = typeof cat === 'object' ? cat._id : cat;
+          return categoryId === category._id;
+        });
+      });
+    }).length === 0 && (
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+        Total dashboards <span className="ml-1 text-gray-500">({plan.dashboards?.length || 0})</span>
+      </div>
+    )}
   </div>
 </div>
+
                       <ul className="space-y-4 mb-8 flex-grow">
                         {plan.features.map((feature, i) => (
                           <motion.li 

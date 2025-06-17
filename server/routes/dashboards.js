@@ -1,3 +1,5 @@
+
+// dashboardRoutes.js
 const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
@@ -6,9 +8,10 @@ const User = require('../models/User');
 
 // IMPORTANT: Routes spécifiques doivent être définies AVANT les routes avec paramètres
 
-// Route publique (SANS authentification) - doit être en premier
+// Routes publiques (SANS authentification) - doivent être en premier
 router.get('/public', dashboardController.getPublicDashboards);
-router.get('/private-names', dashboardController.getPrivateDashboardNames); 
+router.get('/private-names', dashboardController.getPrivateDashboardNames);
+router.get('/public-names', dashboardController.getPublicDashboardNames); // Nouvelle route
 
 router.get('/my-dashboards', isAuthenticated, async (req, res) => {
   try {
@@ -22,9 +25,15 @@ router.get('/my-dashboards', isAuthenticated, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
-// Routes publiques (nécessitent seulement une authentification)
+
+// Routes publiques (nécessitent seulement une authentification) 
 router.get('/', isAuthenticated, dashboardController.getAllDashboards);
 router.get('/stats', isAuthenticated, dashboardController.getDashboardStats);
+
+// Dans dashboardRoutes.js
+// Ajouter avant la route avec paramètre ID
+router.get('/:id/categories', isAuthenticated, dashboardController.getDashboardCategories);
+router.get('/category/:categoryId', isAuthenticated, dashboardController.getDashboardsByCategory);
 
 // Routes de modification (création, mise à jour, suppression)
 router.post('/', isAuthenticated, dashboardController.createDashboard);

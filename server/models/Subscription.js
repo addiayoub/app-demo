@@ -15,6 +15,14 @@ const subscriptionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+    isTrial: {
+    type: Boolean,
+    default: false
+  },
+   trialUsed: {
+    type: Boolean,
+    default: false
+  },
   status: {
     type: String,
     enum: ['active', 'past_due', 'unpaid', 'canceled', 'incomplete', 'incomplete_expired', 'trialing'],

@@ -5,7 +5,11 @@ const pricingController = require('../controllers/pricingController');
 
 // Routes publiques
 router.get('/plans', pricingController.getPlans);
-
+router.post(
+  '/start-trial',
+  isAuthenticated, // Ajoutez ce middleware pour s'assurer que l'utilisateur est connecté
+  pricingController.startTrial
+);
 // Routes protégées
 router.post('/create-subscription', isAuthenticated, pricingController.createSubscription);
 router.post('/cancel-subscription', isAuthenticated, pricingController.cancelSubscription); // Fixed: cancel -> cancelSubscription

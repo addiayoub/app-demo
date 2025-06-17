@@ -1,7 +1,9 @@
 // controllers/adminController.js
 const User = require('../models/User');
 const Dashboard = require('../models/Dashboard');
+const Subscription = require('../models/Subscription');
 const emailService = require('../services/emailService');
+const PricingPlan = require('../models/PricingPlan');
 const adminController = {
   // Obtenir tous les utilisateurs
   getAllUsers: async (req, res) => {
@@ -16,7 +18,171 @@ const adminController = {
       });
     }
   },
+// Méthodes mises à jour dans adminController.js
 
+// Méthode getUserPlans mise à jour
+getUserPlans: async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Vérifier que l'utilisateur existe
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Récupérer TOUS les abonnements de l'utilisateur (actifs, annulés, expirés, essais)
+    const subscriptions = await Subscription.find({ user: userId })
+      .populate({
+        path: 'plan',
+        populate: {
+          path: 'dashboards',
+          select: 'name _id',
+        },
+      })
+      .populate({
+        path: 'dashboards',
+        select: 'name _id',
+      })
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, plans: subscriptions });
+  } catch (error) {
+    console.error('Error fetching user plans:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+},
+
+// Méthode revokeUserSubscription mise à jour pour gérer les essais
+revokeUserSubscription: async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Trouver l'abonnement actif OU en essai
+    const subscription = await Subscription.findOne({ 
+      user: userId, 
+      status: { $in: ['active', 'trialing'] }
+    }).populate('plan');
+
+    if (!subscription) {
+      return res.status(404).json({ 
+        message: 'Aucun abonnement actif ou essai trouvé' 
+      });
+    }
+
+    // Annuler l'abonnement
+    subscription.status = 'canceled';
+    subscription.canceledAt = new Date();
+    await subscription.save();
+
+    // Mettre à jour l'utilisateur
+    const user = await User.findById(userId);
+    if (user) {
+      user.role = 'user'; // Rétrograder au rôle de base
+      user.dashboards = []; // Supprimer tous les dashboards
+      await user.save();
+    }
+
+    console.log(`Abonnement ${subscription.isTrial ? '(essai)' : ''} révoqué pour l'utilisateur ${user?.email || userId}`);
+
+    res.json({ 
+      message: `${subscription.isTrial ? 'Essai' : 'Abonnement'} révoqué avec succès`,
+      subscription: subscription
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la révocation de l\'abonnement:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la révocation de l\'abonnement', 
+      error: error.message 
+    });
+  }
+},
+
+// Méthode cancelPlan mise à jour
+cancelPlan: async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Trouver l'utilisateur d'abord
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'Utilisateur non trouvé' 
+      });
+    }
+
+    // Trouver l'abonnement actif OU en essai
+    const subscription = await Subscription.findOne({ 
+      user: userId, 
+      status: { $in: ['active', 'trialing'] } // Inclure les essais
+    }).populate('plan');
+
+    if (!subscription) {
+      return res.status(404).json({ 
+        message: 'Aucun abonnement actif ou essai trouvé pour cet utilisateur' 
+      });
+    }
+
+    // Annuler l'abonnement
+    subscription.status = 'canceled';
+    subscription.canceledAt = new Date();
+    await subscription.save();
+    
+    const subscriptionInfo = {
+      planName: subscription.plan ? subscription.plan.name : 'Plan inconnu',
+      canceledAt: subscription.canceledAt,
+      wasTrialing: subscription.isTrial || false
+    };
+
+    console.log(`Plan ${subscription.isTrial ? '(essai)' : ''} annulé pour l'utilisateur ${user.email}`);
+
+    // Réinitialiser le rôle utilisateur et supprimer les dashboards
+    user.role = 'user';
+    user.dashboards = [];
+    await user.save();
+
+    console.log(`Rôle utilisateur réinitialisé et dashboards supprimés pour ${user.email}`);
+
+    // Envoyer l'email d'annulation
+    try {
+      if (subscription.plan) {
+        await emailService.sendPlanCancellationEmail(
+          user.email,
+          user.name,
+          subscription.plan.name,
+          subscription.isTrial // Indiquer si c'était un essai
+        );
+        console.log(`Email d'annulation ${subscription.isTrial ? 'd\'essai' : 'de plan'} envoyé à ${user.email}`);
+      }
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'annulation:', emailError);
+      // Continuer même si l'email échoue
+    }
+
+    // Obtenir les informations utilisateur mises à jour
+    const updatedUser = await User.findById(userId).select('-password -__v');
+
+    res.json({ 
+      message: `${subscription.isTrial ? 'Essai' : 'Plan'} annulé avec succès`,
+      user: updatedUser,
+      subscription: subscriptionInfo,
+      actions: [
+        subscription.isTrial ? 'Essai annulé' : 'Abonnement annulé',
+        'Rôle utilisateur réinitialisé',
+        'Dashboards supprimés',
+        'Email de notification envoyé'
+      ]
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de l\'annulation du plan:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'annulation du plan', 
+      error: error.message 
+    });
+  }
+},
   // Créer un nouvel utilisateur
   createUser: async (req, res) => {
     try {
@@ -268,7 +434,285 @@ getUserDashboards: async (req, res) => {
     });
   }
 },
+// Assigner un plan à un utilisateur (avec ses dashboards)
+// Assigner un plan à un utilisateur (avec création d'abonnement)
+assignPlanToUser: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { planId } = req.body;
 
+    // Vérifier que l'utilisateur et le plan existent
+    const [user, plan] = await Promise.all([
+      User.findById(userId),
+      PricingPlan.findById(planId).populate('dashboards')
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan non trouvé' });
+    }
+
+    // Vérifier si l'utilisateur a déjà un abonnement actif
+    const existingSubscription = await Subscription.findOne({ 
+      user: userId, 
+      status: 'active' 
+    });
+
+    // Si un abonnement actif existe, l'annuler d'abord
+    if (existingSubscription) {
+      existingSubscription.status = 'canceled';
+      await existingSubscription.save();
+      console.log(`Abonnement précédent annulé pour l'utilisateur ${user.email}`);
+    }
+
+    // Mettre à jour le rôle de l'utilisateur selon le plan
+    let newRole = 'user';
+    const planNameLower = plan.name.toLowerCase();
+    if (planNameLower.includes('pro')) {
+      newRole = 'pro';
+    } else if (planNameLower.includes('entreprise') || planNameLower.includes('enterprise')) {
+      newRole = 'enterprise';
+    }
+
+    // Créer le nouvel abonnement
+    const currentDate = new Date();
+    const endDate = new Date();
+    
+    // Définir la période selon le cycle de facturation du plan
+    switch (plan.billingCycle) {
+      case 'monthly':
+        endDate.setMonth(endDate.getMonth() + 1);
+        break;
+      case 'yearly':
+        endDate.setFullYear(endDate.getFullYear() + 1);
+        break;
+      case 'quarterly':
+        endDate.setMonth(endDate.getMonth() + 3);
+        break;
+      default:
+        endDate.setMonth(endDate.getMonth() + 1); // Par défaut mensuel
+    }
+
+    const newSubscription = new Subscription({
+      user: userId,
+      plan: planId,
+      stripeSubscriptionId: `admin_assigned_${Date.now()}_${userId}`, // ID unique pour les assignations admin
+      status: 'active',
+      currentPeriodStart: currentDate,
+      currentPeriodEnd: endDate,
+      dashboards: plan.dashboards.map(dashboard => dashboard._id)
+    });
+
+    await newSubscription.save();
+    console.log(`Nouvel abonnement créé pour l'utilisateur ${user.email}`);
+
+    // Assigner les dashboards du plan à l'utilisateur
+    const dashboardAssignments = plan.dashboards.map(dashboard => ({
+      dashboardId: dashboard._id,
+      expiresAt: endDate // Les dashboards expirent avec l'abonnement
+    }));
+
+    // Nettoyer les anciens dashboards de l'utilisateur
+    user.dashboards = [];
+
+    // Ajouter les nouveaux dashboards
+    dashboardAssignments.forEach(assignment => {
+      user.dashboards.push({
+        dashboard: assignment.dashboardId,
+        expiresAt: assignment.expiresAt
+      });
+    });
+
+    // Mettre à jour le rôle et sauvegarder l'utilisateur
+    user.role = newRole;
+    await user.save();
+
+    // Envoyer l'email de notification
+    try {
+      await emailService.sendPlanAssignmentEmail(
+        user.email,
+        user.name,
+        plan,
+        plan.dashboards
+      );
+      console.log(`Email d'assignation de plan envoyé à ${user.email}`);
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email:', emailError);
+      // Continuer même si l'email échoue
+    }
+
+    // Retourner la réponse avec les informations complètes
+    const updatedUser = await User.findById(userId)
+      .select('-password -__v')
+      .populate('dashboards.dashboard');
+
+    const subscriptionWithDetails = await Subscription.findById(newSubscription._id)
+      .populate('plan')
+      .populate('dashboards', 'name url');
+
+    res.json({
+      message: `Plan ${plan.name} assigné avec succès`,
+      user: updatedUser,
+      subscription: subscriptionWithDetails,
+      plan: {
+        name: plan.name,
+        price: plan.price,
+        currency: plan.currency,
+        billingCycle: plan.billingCycle,
+        dashboards: plan.dashboards
+      },
+      assignmentDetails: {
+        subscriptionId: newSubscription._id,
+        expiresAt: endDate,
+        dashboardsCount: plan.dashboards.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de l\'assignation du plan:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'assignation du plan', 
+      error: error.message 
+    });
+  }
+},
+
+// Obtenir l'abonnement d'un utilisateur
+getUserSubscription: async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const subscription = await Subscription.findOne({ 
+      user: userId,
+      status: 'active' 
+    })
+    .populate({
+      path: 'plan',
+      populate: {
+        path: 'dashboards',
+        select: 'name url _id'
+      }
+    })
+    .populate('dashboards', 'name url _id')
+    .sort({ createdAt: -1 });
+
+    if (!subscription) {
+      return res.json({
+        message: 'Aucun abonnement actif trouvé',
+        hasSubscription: false,
+        subscription: null
+      });
+    }
+
+    // Calculer les jours restants
+    const now = new Date();
+    const endDate = new Date(subscription.currentPeriodEnd);
+    const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+
+    res.json({
+      message: 'Abonnement récupéré avec succès',
+      hasSubscription: true,
+      subscription: {
+        ...subscription.toObject(),
+        daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
+        isExpired: daysRemaining <= 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'abonnement:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération de l\'abonnement', 
+      error: error.message 
+    });
+  }
+},
+
+// Révoquer un abonnement
+revokeUserSubscription: async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Trouver l'abonnement actif
+    const subscription = await Subscription.findOne({ 
+      user: userId, 
+      status: 'active' 
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ 
+        message: 'Aucun abonnement actif trouvé' 
+      });
+    }
+
+    // Annuler l'abonnement
+    subscription.status = 'canceled';
+    await subscription.save();
+
+    // Mettre à jour l'utilisateur
+    const user = await User.findById(userId);
+    if (user) {
+      user.role = 'user'; // Rétrograder au rôle de base
+      user.dashboards = []; // Supprimer tous les dashboards
+      await user.save();
+    }
+
+    console.log(`Abonnement révoqué pour l'utilisateur ${user?.email || userId}`);
+
+    res.json({ 
+      message: 'Abonnement révoqué avec succès',
+      subscription: subscription
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la révocation de l\'abonnement:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la révocation de l\'abonnement', 
+      error: error.message 
+    });
+  }
+},
+// Get single pricing plan by ID
+getPlanById: async (req, res) => {
+  try {
+    const plan = await PricingPlan.findById(req.params.id)
+      .populate('dashboards', 'name _id url');
+    
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    res.json({
+      message: 'Plan retrieved successfully',
+      plan
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error getting plan', 
+      error: error.message 
+    });
+  }
+},
+// Méthode pour obtenir la liste des plans disponibles
+getAvailablePlans: async (req, res) => {
+  try {
+    const plans = await PricingPlan.find({ isActive: true })
+      .populate('dashboards', 'name _id')
+      .sort('order');
+
+    res.json({
+      message: 'Plans récupérés avec succès',
+      plans
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération des plans', 
+      error: error.message 
+    });
+  }
+},
 // Assign dashboards
 // Dans adminController.js
 assignDashboards: async (req, res) => {

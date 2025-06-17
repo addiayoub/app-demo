@@ -80,7 +80,8 @@ app.use('/api/dashboards', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api', contactRoutes);
-
+// Après les autres routes
+app.use('/api/categories', require('./routes/categoryRoutes'));
 app.get('/', (req, res) => {
   res.json({ message: 'API en cours d\'exécution!' });
 });

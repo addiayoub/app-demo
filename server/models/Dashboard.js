@@ -17,19 +17,27 @@ const dashboardSchema = new mongoose.Schema({
       message: props => `${props.value} n'est pas une URL Power BI valide!`
     }
   },
-    active: {
+  description: {
+    type: String,
+    trim: true
+  },
+  active: {
     type: Boolean,
-    default: true  // Par défaut, le dashboard est actif
+    default: true
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-   isPublic: {
+  isPublic: {
     type: Boolean,
     default: false
   },
+  categories: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category'
+  }],
   allowedUsers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -44,7 +52,6 @@ const dashboardSchema = new mongoose.Schema({
   }
 });
 
-// Mise à jour de la date de modification avant sauvegarde
 dashboardSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

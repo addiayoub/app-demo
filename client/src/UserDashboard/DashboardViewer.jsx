@@ -2,43 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, 
-  Search, 
-  Filter, 
-  BarChart2, 
-  ChevronDown, 
-  ChevronUp,
+  BarChart2,
   Globe,
-  Lock,
-  Eye,
-  EyeOff,
-  Calendar,
-  RotateCcw,
-  Plus,
-  LogOut,
-  Download,
-  Printer,
-  FileText,
-  FileSliders,
-  FileSignature,
-  AlertCircle,
-  Info
+  AlertCircle
 } from 'lucide-react';
-import { useAuth } from '../Auth/AuthContext';
-import axios from 'axios';
 
 const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
-
-  // Récupérer les données correctes du dashboard
-  // Pour les dashboards publics, les données sont directement sur l'objet
-  // Pour les dashboards personnels, elles peuvent être dans dashboard.data
-  const dashboardData = dashboard.data || dashboard;
-
-  console.log('Dashboard in viewer:', dashboard);
-  console.log('Dashboard data:', dashboardData);
 
   useEffect(() => {
     setIsLoading(true);
@@ -48,25 +20,53 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
       setIsLoading(false);
     }, 1000);
 
-    // Calcul du temps restant avant expiration (seulement pour les dashboards assignés)
-    if (dashboard.accessType === 'assigned' && dashboard.expiresAt) {
-      const updateTimeLeft = () => {
+    // Calcul du temps restant avant expiration
+    const updateTimeLeft = () => {
+      let expirationDate;
+      
+      // Pour les dashboards assignés directement
+      if (dashboard.accessType === 'assigned' && dashboard.expiresAt) {
+        expirationDate = new Date(dashboard.expiresAt);
+      } 
+      // Pour les dashboards inclus dans un abonnement
+      else if (dashboard.accessType === 'subscription' && dashboard.subscriptionInfo?.currentPeriodEnd) {
+        expirationDate = new Date(dashboard.subscriptionInfo.currentPeriodEnd);
+      }
+      
+      // Si on a une date d'expiration, calculer le temps restant
+      if (expirationDate) {
         const now = new Date();
-        const expiresAt = new Date(dashboard.expiresAt);
-        const diff = expiresAt - now;
+        const diff = expirationDate - now;
         
         if (diff <= 0) {
           setTimeLeft('Expiré');
           return;
         }
         
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
         
-        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
-      };
-      
+        const remainingHours = hours % 24;
+        const remainingMinutes = minutes % 60;
+        const remainingSeconds = seconds % 60;
+        
+        // Formatage avec secondes
+        if (days > 0) {
+          setTimeLeft(`${days}j ${remainingHours}h ${remainingMinutes}m ${remainingSeconds}s`);
+        } else if (hours > 0) {
+          setTimeLeft(`${hours}h ${remainingMinutes}m ${remainingSeconds}s`);
+        } else if (minutes > 0) {
+          setTimeLeft(`${minutes}m ${remainingSeconds}s`);
+        } else {
+          setTimeLeft(`${seconds}s`);
+        }
+      }
+    };
+    
+    // Lancer le calcul immédiatement et mettre à jour toutes les secondes
+    if (dashboard.accessType === 'assigned' || dashboard.accessType === 'subscription') {
       updateTimeLeft();
       const interval = setInterval(updateTimeLeft, 1000);
       
@@ -83,11 +83,21 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
     setIframeLoaded(true);
   };
 
-  // Les dashboards publics n'expirent pas
-  const isExpired = dashboard.accessType === 'assigned' && 
-                   dashboard.expiresAt && 
-                   new Date(dashboard.expiresAt) < new Date();
-
+  // Vérifier si le dashboard est expiré
+  const isExpired = () => {
+    if (dashboard.accessType === 'public') return false;
+    
+    let expirationDate;
+    
+    if (dashboard.accessType === 'assigned' && dashboard.expiresAt) {
+      expirationDate = new Date(dashboard.expiresAt);
+    } 
+    else if (dashboard.accessType === 'subscription' && dashboard.subscriptionInfo?.currentPeriodEnd) {
+      expirationDate = new Date(dashboard.subscriptionInfo.currentPeriodEnd);
+    }
+    
+    return expirationDate && new Date(expirationDate) < new Date();
+  };
   return (
     <motion.div
       key={dashboard._id}
@@ -103,7 +113,7 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
           transition={{ delay: 0.1 }}
         >
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            {dashboardData.name}
+            {dashboard.name}
             
             {/* Badge pour le type d'accès */}
             {dashboard.accessType === 'public' && (
@@ -118,7 +128,7 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
               </motion.span>
             )}
             
-            {!dashboardData.active && (
+            {!dashboard.active && (
               <motion.span 
                 className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full"
                 initial={{ scale: 0 }}
@@ -129,25 +139,39 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
               </motion.span>
             )}
             
-            {/* Badge d'expiration seulement pour les dashboards assignés */}
-            {dashboard.accessType === 'assigned' && dashboard.expiresAt && (
+            {/* Badge d'expiration pour les dashboards assignés ou d'abonnement */}
+            {(dashboard.accessType === 'assigned' || dashboard.accessType === 'subscription') && (
+        <motion.span 
+          className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            isExpired() 
+              ? 'bg-red-100 text-red-800' 
+              : 'bg-yellow-100 text-yellow-800'
+          }`}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, delay: 0.2 }}
+        >
+          <Clock size={12} />
+          {isExpired() ? 'Expiré' : timeLeft}
+        </motion.span>
+      )}
+      
+            
+            {/* Badge pour les dashboards d'abonnement */}
+            {dashboard.accessType === 'subscription' && dashboard.subscriptionInfo && (
               <motion.span 
-                className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                  isExpired 
-                    ? 'bg-red-100 text-red-800' 
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}
+                className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 500, delay: 0.2 }}
+                transition={{ type: 'spring', stiffness: 500, delay: 0.3 }}
               >
-                <Clock size={12} />
-                {isExpired ? 'Expiré' : timeLeft}
+                {dashboard.subscriptionInfo.planName}
+                {dashboard.subscriptionInfo.isTrial && ' (Essai)'}
               </motion.span>
             )}
           </h2>
-          {dashboardData.description && (
-            <p className="text-gray-600 mt-1">{dashboardData.description}</p>
+          {dashboard.description && (
+            <p className="text-gray-600 mt-1">{dashboard.description}</p>
           )}
         </motion.div>
         
@@ -162,7 +186,7 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
       </div>
       
       <div className="h-[calc(100vh-200px)] min-h-[500px] relative">
-        {!dashboardData.active ? (
+        {!dashboard.active ? (
           <motion.div 
             className="absolute inset-0 flex items-center justify-center bg-gray-50"
             initial={{ opacity: 0 }}
@@ -201,7 +225,7 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
               </motion.button>
             </motion.div>
           </motion.div>
-        ) : isExpired ? (
+        ) : isExpired() ? (
           <motion.div 
             className="absolute inset-0 flex items-center justify-center bg-gray-50"
             initial={{ opacity: 0 }}
@@ -228,8 +252,12 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
               </motion.div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Accès expiré</h3>
               <p className="text-gray-500 mb-4">
-                Votre accès à ce tableau de bord a expiré le {new Date(dashboard.expiresAt).toLocaleDateString()}.
-                Veuillez contacter l'administrateur pour un renouvellement.
+                Votre accès à ce tableau de bord a expiré {
+                  dashboard.accessType === 'assigned' ? 
+                    `le ${new Date(dashboard.expiresAt).toLocaleDateString()}` : 
+                    `le ${new Date(dashboard.subscriptionInfo.currentPeriodEnd).toLocaleDateString()}`
+                }.
+                {dashboard.accessType === 'subscription' && ' Veuillez renouveler votre abonnement.'}
               </p>
               <motion.button
                 onClick={() => setSelectedDashboard(null)}
@@ -274,8 +302,8 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
               transition={{ duration: 0.3 }}
             >
               <iframe 
-                src={dashboardData.url} 
-                title={dashboardData.name}
+                src={dashboard.url} 
+                title={dashboard.name}
                 className="w-full h-full border-0"
                 loading="lazy"
                 onLoad={handleIframeLoad}
@@ -291,24 +319,27 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
         >
-          {dashboard.accessType === 'public' ? 'Dashboard public' : ''} {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
-            ? new Date(dashboardData.createdAt).toLocaleDateString() 
+          {dashboard.accessType === 'public' ? 'Dashboard public' : ''} 
+          {dashboard.createdAt && !isNaN(new Date(dashboard.createdAt).getTime()) 
+            ? new Date(dashboard.createdAt).toLocaleDateString() 
             : 'Date invalide'}
         </motion.div>
-         <div className="p-4 bg-gray-50 flex justify-end">
-                    <img src="/ID&A TECH .png" alt="Logo" className="w-32 " />
-                  </div>
+        <div className="p-4 bg-gray-50 flex justify-end">
+          <img src="/ID&A TECH .png" alt="Logo" className="w-32 " />
+        </div>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="flex items-center gap-2"
         >
-          {dashboard.accessType === 'assigned' && dashboard.expiresAt && (
+          {(dashboard.accessType === 'assigned' || dashboard.accessType === 'subscription') && (
             <>
               <Clock size={14} />
-              {isExpired ? 'Expiré le ' : 'Expire le '}
-              {new Date(dashboard.expiresAt).toLocaleDateString()}
+              {isExpired() ? 'Expiré le ' : 'Expire le '}
+              {dashboard.accessType === 'assigned' 
+                ? new Date(dashboard.expiresAt).toLocaleDateString()
+                : new Date(dashboard.subscriptionInfo.currentPeriodEnd).toLocaleDateString()}
             </>
           )}
           {dashboard.accessType === 'public' && (
@@ -318,7 +349,6 @@ const DashboardViewer = ({ dashboard, user, setSelectedDashboard }) => {
             </>
           )}
         </motion.div>
-        
       </div>
     </motion.div>
   );

@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, UserPlus, UserX, UserCheck, Edit, Trash2, 
-  BarChart2, PieChart, LineChart, RefreshCw, Search,
+  BarChart2, CreditCard, LineChart, RefreshCw, Search,
   ChevronDown, ChevronUp, Loader2,
   LogOut,
   Settings
@@ -14,6 +14,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Swal from 'sweetalert2';
 import DashboardAssignmentModal from './DashboardAssignmentModal';
 import { showDeleteConfirmation, showErrorAlert, showLoadingAlert, showSuccessAlert } from './alert';
+import PlanAssignmentModal from './PlanAssignmentModal';
 
 const User_admin = () => {
   const { user: currentUser, logout } = useAuth();
@@ -28,7 +29,12 @@ const User_admin = () => {
   const [dashboards, setDashboards] = useState([]);
   const [assignedDashboards, setAssignedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
+const [showPlanAssignment, setShowPlanAssignment] = useState(false);
+const [selectedUserIdForPlan, setSelectedUserIdForPlan] = useState(null);
+const [allUserPlans, setAllUserPlans] = useState({}); // { userId: plans[] }
 
+const [plans, setPlans] = useState([]);
+const [userPlans, setUserPlans] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,6 +57,42 @@ const User_admin = () => {
   // États pour l'avatar
   const [avatarPreview, setAvatarPreview] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+const fetchAllUserPlans = async (userIds) => {
+  try {
+    const plansPromises = userIds.map(async (userId) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (!response.ok) {
+          console.warn(`Erreur lors du chargement des plans pour l'utilisateur ${userId}`);
+          return { userId, plans: [] };
+        }
+        
+        const data = await response.json();
+        return { userId, plans: data.plans || [] };
+      } catch (error) {
+        console.warn(`Erreur lors du chargement des plans pour l'utilisateur ${userId}:`, error);
+        return { userId, plans: [] };
+      }
+    });
+
+    const results = await Promise.all(plansPromises);
+    const plansMap = {};
+    
+    results.forEach(({ userId, plans }) => {
+      plansMap[userId] = plans;
+    });
+    
+    setAllUserPlans(plansMap);
+  } catch (error) {
+    console.error('Erreur lors du chargement des plans utilisateurs:', error);
+  }
+};
 
   const handleAssignDashboards = (userId) => {
     setSelectedUserId(userId);
@@ -143,7 +185,130 @@ const unassignDashboard = async (dashboardId) => {
     showErrorAlert('Erreur', 'Échec du retrait du tableau de bord');
   }
 };
+const fetchPlans = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/pricing/plans`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Échec du chargement des plans');
+    
+    const data = await response.json();
+    setPlans(data.plans || []);
+  } catch (error) {
+    console.error('Erreur lors du chargement des plans:', error);
+    toast.error('Échec du chargement des plans');
+  }
+};
 
+const fetchUserPlans = async (userId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Échec du chargement des plans utilisateur');
+    
+    const data = await response.json();
+    setUserPlans(data.plans || []);
+  } catch (error) {
+    console.error('Erreur lors du chargement des plans utilisateur:', error);
+    toast.error('Échec du chargement des plans utilisateur');
+    setUserPlans([]);
+  }
+};
+
+const assignPlan = async (planId) => {
+  try {
+    const loadingAlert = showLoadingAlert('Assignation en cours...');
+    
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/assign-plan`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ planId })
+    });
+
+    if (!response.ok) throw new Error('Échec de l\'assignation du plan');
+
+    const result = await response.json();
+    loadingAlert.close();
+
+    // Mettre à jour les plans de l'utilisateur dans allUserPlans
+    await fetchUserPlans(selectedUserIdForPlan);
+    const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
+    setAllUserPlans(prev => ({
+      ...prev,
+      [selectedUserIdForPlan]: updatedPlans
+    }));
+    
+    await fetchUsers();
+
+    showSuccessAlert('Assigné!', 'Plan assigné avec succès');
+  } catch (error) {
+    showErrorAlert('Erreur', 'Échec de l\'assignation du plan');
+  }
+};
+const cancelPlan = async (planId) => {
+  try {
+    const loadingAlert = showLoadingAlert('Annulation en cours...');
+    
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/cancel-plan`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ planId })
+    });
+
+    if (!response.ok) throw new Error('Échec de l\'annulation du plan');
+
+    const result = await response.json();
+    loadingAlert.close();
+
+    // Mettre à jour les plans de l'utilisateur dans allUserPlans
+    await fetchUserPlans(selectedUserIdForPlan);
+    const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
+    setAllUserPlans(prev => ({
+      ...prev,
+      [selectedUserIdForPlan]: updatedPlans
+    }));
+    
+    await fetchUsers();
+
+    showSuccessAlert('Annulé!', 'Plan annulé avec succès');
+  } catch (error) {
+    showErrorAlert('Erreur', 'Échec de l\'annulation du plan');
+  }
+};
+
+const handleAssignPlans = (userId) => {
+  setSelectedUserIdForPlan(userId);
+  setShowPlanAssignment(true);
+  
+  // Utiliser les plans déjà chargés ou les recharger si nécessaire
+  const existingPlans = allUserPlans[userId];
+  if (existingPlans) {
+    setUserPlans(existingPlans);
+  } else {
+    fetchUserPlans(userId);
+  }
+};
+
+useEffect(() => {
+  fetchPlans();
+}, []);
 useEffect(() => {
   if (selectedUserId) {
     setAssignedDashboards([]);
@@ -303,32 +468,52 @@ const fetchAssignedDashboards = async (userId) => {
   }, []);
 
   const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (response.status === 401) {
-        logout();
-        return;
+  try {
+    setLoading(true);
+    const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
-      
-      if (!response.ok) throw new Error('Échec du chargement des utilisateurs');
-      
-      const data = await response.json();
-      setUsers(data || []);
-      updateChartData(data || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
-      toast.error('Échec du chargement des utilisateurs');
-      setLoading(false);
+    });
+    
+    if (response.status === 401) {
+      logout();
+      return;
     }
-  };
+    
+    if (!response.ok) throw new Error('Échec du chargement des utilisateurs');
+    
+    const data = await response.json();
+    const usersData = data || [];
+    setUsers(usersData);
+    updateChartData(usersData);
+    
+    // Charger les plans pour tous les utilisateurs
+    if (usersData.length > 0) {
+      const userIds = usersData.map(user => user._id);
+      await fetchAllUserPlans(userIds);
+    }
+    
+    setLoading(false);
+  } catch (error) {
+    console.error('Erreur lors du chargement des utilisateurs:', error);
+    toast.error('Échec du chargement des utilisateurs');
+    setLoading(false);
+  }
+};
+const getActivePlansCount = (userId) => {
+  const userPlans = allUserPlans[userId] || [];
+  return userPlans.filter(userPlan => {
+    if (!userPlan.currentPeriodEnd) return true; // Plan sans date d'expiration
+    
+    const endDate = new Date(userPlan.currentPeriodEnd);
+    const now = new Date();
+    
+    return userPlan.status !== 'canceled' && endDate >= now;
+  }).length;
+};
+
 
   const fetchStats = async () => {
     try {
@@ -1180,14 +1365,29 @@ const fetchAssignedDashboards = async (userId) => {
     whileTap={{ scale: 0.95 }}
   >
     <BarChart2 size={18} />
+    {/* Badge pour les tableaux de bord assignés */}
+    {(assignedDashboards.length > 0 || (user.dashboards && user.dashboards.length > 0)) && (
+      <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
+        {selectedUserId === user._id ? assignedDashboards.length : (user.dashboards?.length || 0)}
+      </span>
+    )}
   </motion.button>
   
-  {/* Utilisez assignedDashboards.length si disponible, sinon user.dashboards.length */}
-  {(assignedDashboards.length > 0 || (user.dashboards && user.dashboards.length > 0)) && (
-    <div className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
-      {selectedUserId === user._id ? assignedDashboards.length : (user.dashboards?.length || 0)}
-    </div>
-  )}
+  <motion.button
+    onClick={() => handleAssignPlans(user._id)}
+    className="text-green-600 hover:text-green-900 p-2 rounded hover:bg-green-50 cursor-pointer transition-colors duration-200"
+    title="Gérer les plans"
+    whileHover={{ scale: 1.1 }}
+    whileTap={{ scale: 0.95 }}
+  >
+    <CreditCard size={18} />
+    {/* Badge pour afficher seulement le nombre de plans actifs */}
+    {getActivePlansCount(user._id) > 0 && (
+      <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
+        {getActivePlansCount(user._id)}
+      </span>
+    )}
+  </motion.button>
 </div>
                             {user._id !== currentUser?._id && (
                               <motion.button
@@ -1223,6 +1423,18 @@ const fetchAssignedDashboards = async (userId) => {
     assignedDashboards={assignedDashboards}
     onAssign={assignDashboard}
     onUnassign={unassignDashboard}
+  />
+)}
+{showPlanAssignment && (
+  <PlanAssignmentModal
+    onClose={() => {
+      setShowPlanAssignment(false);
+      setSelectedUserIdForPlan(null);
+    }}
+    plans={plans}
+    userPlans={userPlans}
+    onAssign={assignPlan}
+    onCancel={cancelPlan}
   />
 )}
         </motion.section>

@@ -171,7 +171,195 @@ class EmailService {
       throw new Error('Erreur lors de l\'envoi de l\'email de vérification');
     }
   }
+  // Dans EmailService.js, ajoutez cette nouvelle méthode
+async sendPlanAssignmentEmail(email, name, plan, dashboards) {
+  // Construire la liste des dashboards inclus dans le plan
+  const dashboardList = dashboards.map(dashboard => {
+    return `
+      <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; margin: 10px 0;">
+        <h4 style="color: #495057; margin: 0 0 10px 0;">${dashboard.name}</h4>
+        <p style="margin: 5px 0; color: #6c757d; font-size: 14px;">
+          <strong>Accès :</strong> ${plan.billingCycle === 'monthly' ? 'Mensuel' : 'Annuel'}
+        </p>
+       
+      </div>
+    `;
+  }).join('');
 
+  const content = `
+    <p>Nous avons le plaisir de vous informer que le plan <strong>${plan.name}</strong> vous a été assigné avec succès.</p>
+    
+    <div style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #1971c2; margin-top: 0;">Détails du plan</h3>
+      <p><strong>Nom du plan :</strong> ${plan.name}</p>
+      <p><strong>Type d'abonnement :</strong> ${plan.billingCycle === 'monthly' ? 'Mensuel' : 'Annuel'}</p>
+      <p><strong>Prix :</strong> ${plan.price} ${plan.currency}</p>
+      <p><strong>Statut :</strong> Actif</p>
+    </div>
+    
+    <h3 style="color: #495057; border-bottom: 2px solid #6e8efb; padding-bottom: 10px;">
+      Tableaux de bord inclus :
+    </h3>
+    
+    ${dashboardList}
+    
+    <div class="note">
+      <p><strong>Fonctionnalités principales du plan :</strong></p>
+      <ul>
+        ${plan.features.filter(f => f.available).map(f => `<li>${f.text}</li>`).join('')}
+      </ul>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.CLIENT_URL}/dashboards" class="button">Accéder à mes tableaux de bord</a>
+    </p>
+    
+    <div style="background: #fff3bf; border: 1px solid #ffec99; border-radius: 6px; padding: 12px; margin: 20px 0;">
+      <p style="margin: 0; color: #5f3dc4; font-size: 14px;">
+        <strong>💡 Astuce :</strong> Votre nouveau rôle <strong>${plan.name.toLowerCase().includes('pro') ? 'Pro' : 'Entreprise'}</strong> 
+        vous donne accès à des fonctionnalités supplémentaires sur la plateforme.
+      </p>
+    </div>
+    
+    <p>Si vous avez des questions concernant votre nouveau plan ou si vous rencontrez des difficultés, 
+    n'hésitez pas à <a href="${process.env.CLIENT_URL}/contact" style="color: #6e8efb;">contacter notre équipe</a>.</p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: `Nouveau plan assigné : ${plan.name} - ${process.env.APP_NAME || 'Notre plateforme'}`,
+    html: this.getBaseTemplate(name, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email d'assignation de plan envoyé à ${email}`);
+  } catch (error) {
+    console.error('Erreur envoi email d\'assignation de plan:', error);
+    throw new Error('Erreur lors de l\'envoi de l\'email d\'assignation de plan');
+  }
+}
+// Ajoutez ces méthodes à EmailService
+async sendAdminTrialNotification(adminEmail, adminName, user, plan) {
+  const content = `
+    <p>Un nouvel essai de plan a été activé par un utilisateur :</p>
+    
+    <div style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #1971c2; margin-top: 0;">Détails de l'utilisateur</h3>
+      <p><strong>Nom :</strong> ${user.name}</p>
+      <p><strong>Email :</strong> ${user.email}</p>
+      <p><strong>Date d'inscription :</strong> ${new Date(user.createdAt).toLocaleDateString('fr-FR')}</p>
+    </div>
+    
+    <div style="background: #fff3bf; border: 1px solid #ffec99; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #5f3dc4; margin-top: 0;">Détails du plan d'essai</h3>
+      <p><strong>Plan :</strong> ${plan.name}</p>
+      <p><strong>Type :</strong> ${plan.billingCycle === 'monthly' ? 'Mensuel' : 'Annuel'}</p>
+      <p><strong>Prix :</strong> ${plan.price} ${plan.currency}</p>
+      <p><strong>Durée de l'essai :</strong> 14 jours</p>
+      <p><strong>Date d'expiration :</strong> ${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR')}</p>
+    </div>
+    
+    <div class="note">
+      <p><strong>Actions possibles :</strong></p>
+      <ul>
+        <li>Contacter l'utilisateur pour un suivi</li>
+        <li>Vérifier le profil de l'utilisateur dans l'administration</li>
+        <li>Préparer des informations complémentaires si nécessaire</li>
+      </ul>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.ADMIN_URL || process.env.CLIENT_URL}/admin/users/${user._id}" class="button">
+        Voir le profil utilisateur
+      </a>
+    </p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmail,
+    subject: `Nouvel essai activé - ${user.name} - Plan ${plan.name}`,
+    html: this.getBaseTemplate(adminName, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification d'essai envoyée à l'admin ${adminEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email notification admin:', error);
+  }
+}
+
+async sendTrialStartedEmail(email, name, plan, trialEndDate) {
+  const formattedEndDate = trialEndDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const content = `
+    <div style="background: #ebfbee; border: 1px solid #d3f9d8; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <h3 style="color: #2b8a3e; margin-top: 0;">🎉 Votre essai gratuit a commencé !</h3>
+      <p style="font-size: 18px; color: #2b8a3e;">
+        Profitez de toutes les fonctionnalités du plan <strong>${plan.name}</strong> jusqu'au ${formattedEndDate}
+      </p>
+    </div>
+    
+    <p>Merci d'avoir choisi ${process.env.APP_NAME || 'notre plateforme'}. Votre période d'essai de 14 jours pour le plan <strong>${plan.name}</strong> est maintenant active.</p>
+    
+    <div style="background: #fff3bf; border: 1px solid #ffec99; border-radius: 6px; padding: 15px; margin: 20px 0;">
+      <p style="margin: 0; color: #5f3dc4; font-size: 14px;">
+        <strong>📅 Date de fin d'essai :</strong> ${formattedEndDate}
+      </p>
+    </div>
+    
+    <h3 style="color: #495057; border-bottom: 2px solid #6e8efb; padding-bottom: 10px;">
+      Ce que vous pouvez faire pendant votre essai :
+    </h3>
+    
+    <ul>
+      ${plan.features.filter(f => f.available).map(f => `<li>${f.text}</li>`).join('')}
+      <li>Tester toutes les fonctionnalités premium</li>
+      <li>Accéder à tous les tableaux de bord inclus</li>
+      <li>Créer des rapports avancés</li>
+    </ul>
+    
+    <div class="note">
+      <p><strong>💡 Conseil :</strong> Pour tirer le meilleur parti de votre essai :</p>
+      <ol>
+        <li>Explorez toutes les fonctionnalités</li>
+        <li>Configurez vos tableaux de bord</li>
+        <li>Importez vos données</li>
+        <li>N'hésitez pas à nous contacter pour des questions</li>
+      </ol>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.CLIENT_URL}/dashboards" class="button">
+        Commencer à explorer
+      </a>
+    </p>
+    
+    <p>Si vous avez des questions ou besoin d'aide, notre équipe est là pour vous aider. Répondez simplement à cet email ou contactez-nous via <a href="${process.env.CLIENT_URL}/contact" style="color: #6e8efb;">notre page de contact</a>.</p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: `🎉 Votre essai gratuit du plan ${plan.name} a commencé !`,
+    html: this.getBaseTemplate(name, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email de confirmation d'essai envoyé à ${email}`);
+  } catch (error) {
+    console.error('Erreur envoi email confirmation essai:', error);
+  }
+}
   async sendWelcomeEmail(email, name) {
     const content = `
       <p>Bienvenue sur ${process.env.APP_NAME || 'notre plateforme'} ! Nous sommes ravis de vous compter parmi nos membres.</p>
@@ -419,7 +607,319 @@ async sendDashboardAssignmentEmail(email, name, dashboards) {
   }
 }
 // Ajoutez ces méthodes à votre EmailService (dans le fichier EmailService.js)
+// Email lorsque l'essai est sur le point d'expirer (3 jours avant)
+async sendTrialExpiringSoonEmail(email, name, plan, endDate) {
+  const formattedDate = endDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
+  const content = `
+    <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <h3 style="color: #856404; margin-top: 0;">⚠️ Votre essai gratuit se termine bientôt</h3>
+      <p style="font-size: 16px; color: #856404;">
+        Votre essai du plan <strong>${plan.name}</strong> expirera le ${formattedDate}
+      </p>
+    </div>
+    
+    <p>Nous souhaitons vous informer que votre période d'essai gratuit de 14 jours touche à sa fin.</p>
+    
+    <div style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #1971c2; margin-top: 0;">Que se passe-t-il ensuite ?</h3>
+      <p><strong>Après le ${formattedDate} :</strong></p>
+      <ul>
+        <li>Votre accès aux fonctionnalités premium sera suspendu</li>
+        <li>Vos données seront conservées pendant 30 jours</li>
+        <li>Vous pourrez souscrire à un abonnement à tout moment</li>
+      </ul>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.CLIENT_URL}/pricing" class="button" style="background: #fd7e14 !important;">
+        Souscrire à un abonnement
+      </a>
+    </p>
+    
+    <div class="note">
+      <p><strong>Pour continuer à profiter de ${process.env.APP_NAME || 'notre plateforme'} :</strong></p>
+      <ol>
+        <li>Choisissez le plan qui correspond à vos besoins</li>
+        <li>Configurez votre méthode de paiement</li>
+        <li>Conservez l'accès à toutes vos données</li>
+      </ol>
+    </div>
+    
+    <p>Si vous avez des questions ou besoin d'aide, notre équipe est disponible pour vous conseiller.</p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: `⚠️ Votre essai gratuit se termine bientôt - Plan ${plan.name}`,
+    html: this.getBaseTemplate(name, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email d'expiration proche d'essai envoyé à ${email}`);
+  } catch (error) {
+    console.error('Erreur envoi email expiration essai:', error);
+  }
+}
+
+// Email lorsque l'essai a expiré
+async sendTrialExpiredEmail(email, name, plan) {
+  const content = `
+    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <h3 style="color: #721c24; margin-top: 0;">❌ Votre essai gratuit a expiré</h3>
+      <p style="font-size: 16px; color: #721c24;">
+        Votre accès au plan <strong>${plan.name}</strong> a été suspendu
+      </p>
+    </div>
+    
+    <p>Votre période d'essai gratuit de 14 jours est maintenant terminée. Nous espérons que vous avez pu découvrir toutes les fonctionnalités de notre plateforme.</p>
+    
+    <div style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #1971c2; margin-top: 0;">Que faire maintenant ?</h3>
+      <ul>
+        <li><strong>Souscrivez à un abonnement</strong> pour retrouver l'accès à toutes les fonctionnalités</li>
+        <li><strong>Exportez vos données</strong> si nécessaire (disponible pendant 30 jours)</li>
+        <li><strong>Contactez-nous</strong> si vous avez des questions</li>
+      </ul>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.CLIENT_URL}/pricing" class="button">
+        Choisir un abonnement
+      </a>
+    </p>
+    
+    <div class="note">
+      <p><strong>Vos données sont en sécurité :</strong></p>
+      <p>Nous conservons toutes vos données pendant 30 jours après l'expiration de votre essai. 
+      Vous pourrez y accéder immédiatement si vous souscrivez à un abonnement.</p>
+    </div>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: `❌ Votre essai gratuit a expiré - Plan ${plan.name}`,
+    html: this.getBaseTemplate(name, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email d'expiration d'essai envoyé à ${email}`);
+  } catch (error) {
+    console.error('Erreur envoi email expiration essai:', error);
+  }
+}
+
+// Email aux admins lorsqu'un essai expire
+async sendAdminTrialExpiredNotification(adminEmail, adminName, user, plan) {
+  const content = `
+    <p>L'essai d'un utilisateur vient d'expirer :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+      <p><strong>Utilisateur :</strong> ${user.name} (${user.email})</p>
+      <p><strong>Plan :</strong> ${plan.name}</p>
+      <p><strong>Date d'expiration :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+    </div>
+    
+    <h3 style="color: #495057; border-bottom: 2px solid #6e8efb; padding-bottom: 10px;">
+      Actions recommandées :
+    </h3>
+    
+    <ul>
+      <li>Vérifier si l'utilisateur a souscrit à un abonnement</li>
+      <li>Envoyer un email de suivi si nécessaire</li>
+      <li>Consulter l'activité de l'utilisateur pendant l'essai</li>
+    </ul>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.ADMIN_URL || process.env.CLIENT_URL}/admin/users/${user._id}" class="button">
+        Voir le profil utilisateur
+      </a>
+    </p>
+    
+    <div class="note">
+      <p><strong>Statistiques :</strong></p>
+      <p>Cet utilisateur a utilisé ${plan.name} pendant 14 jours. Vous pouvez consulter son activité pour évaluer son engagement.</p>
+    </div>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmail,
+    subject: `[Expiration essai] ${user.name} - Plan ${plan.name}`,
+    html: this.getBaseTemplate(adminName, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification d'expiration d'essai envoyée à l'admin ${adminEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email notification admin:', error);
+  }
+}
+
+// Email lorsque l'abonnement est annulé
+async sendSubscriptionCancelledEmail(email, name, plan, endDate) {
+  const formattedDate = endDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const content = `
+    <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <h3 style="color: #495057; margin-top: 0;">Votre abonnement a été annulé</h3>
+      <p style="font-size: 16px; color: #495057;">
+        Votre accès au plan <strong>${plan.name}</strong> sera maintenu jusqu'au ${formattedDate}
+      </p>
+    </div>
+    
+    <p>Nous confirmons que votre abonnement a bien été annulé comme demandé.</p>
+    
+    <div style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #1971c2; margin-top: 0;">Ce que cela signifie :</h3>
+      <ul>
+        <li>Votre accès actuel reste actif jusqu'au ${formattedDate}</li>
+        <li>Aucun paiement supplémentaire ne sera prélevé</li>
+        <li>Vos données seront conservées pendant 30 jours après l'expiration</li>
+      </ul>
+    </div>
+    
+    <div class="note">
+      <p><strong>Pour réactiver votre abonnement :</strong></p>
+      <p>Vous pouvez souscrire à nouveau à tout moment avant le ${formattedDate} sans perdre vos données ou configurations.</p>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.CLIENT_URL}/pricing" class="button">
+        Souscrire à nouveau
+      </a>
+    </p>
+    
+    <p>Si vous avez des questions ou si cette annulation est une erreur, veuillez nous contacter immédiatement.</p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: `Votre abonnement a été annulé - Plan ${plan.name}`,
+    html: this.getBaseTemplate(name, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email d'annulation envoyé à ${email}`);
+  } catch (error) {
+    console.error('Erreur envoi email annulation:', error);
+  }
+}
+async sendAdminErrorNotification(adminEmail, adminName, errorType, errorDetails, userId) {
+  const adminPortalLink = `${process.env.ADMIN_URL}/users/${userId}`;
+  
+  const content = `
+    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #721c24; margin-top: 0;">⚠️ ERREUR SYSTÈME: ${errorType}</h3>
+    </div>
+    
+    <p>Une erreur s'est produite dans le système :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+      <p><strong>Type d'erreur :</strong> ${errorType}</p>
+      <p><strong>Détails :</strong></p>
+      <pre style="background: #e9ecef; padding: 10px; border-radius: 5px; overflow-x: auto;">${errorDetails}</pre>
+    </div>
+    
+    <div class="note">
+      <p><strong>Actions recommandées :</strong></p>
+      <ol>
+        <li>Vérifier les logs système pour plus de détails</li>
+        <li>Contacter l'équipe technique si nécessaire</li>
+        <li>Suivre le statut de l'utilisateur concerné</li>
+      </ol>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${adminPortalLink}" class="button">Voir le profil utilisateur</a>
+    </p>
+    
+    <p>Ceci est une notification automatique. Veuillez ne pas répondre à cet email.</p>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.APP_NAME || 'System'} - Alerte Erreur" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmail,
+    subject: `[ERREUR] ${errorType} - ${process.env.APP_NAME || 'Système'}`,
+    html: this.getBaseTemplate(adminName, content),
+    priority: 'high'
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification d'erreur envoyée à l'admin ${adminEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email notification admin:', error);
+  }
+}
+// Email aux admins lorsqu'un abonnement est annulé
+async sendAdminSubscriptionCancelledNotification(adminEmail, adminName, user, plan) {
+  const content = `
+    <p>Un utilisateur a annulé son abonnement :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+      <p><strong>Utilisateur :</strong> ${user.name} (${user.email})</p>
+      <p><strong>Plan :</strong> ${plan.name}</p>
+      <p><strong>Date d'annulation :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+      <p><strong>Accès valide jusqu'au :</strong> ${new Date(plan.currentPeriodEnd).toLocaleDateString('fr-FR')}</p>
+    </div>
+    
+    <h3 style="color: #495057; border-bottom: 2px solid #6e8efb; padding-bottom: 10px;">
+      Informations complémentaires :
+    </h3>
+    
+    <ul>
+      <li><strong>Durée de l'abonnement :</strong> ${Math.round((new Date() - new Date(plan.createdAt)) / (1000 * 60 * 60 * 24))} jours</li>
+      <li><strong>Dernière activité :</strong> ${user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('fr-FR') : 'Inconnue'}</li>
+    </ul>
+    
+    <p style="text-align: center;">
+      <a href="${process.env.ADMIN_URL || process.env.CLIENT_URL}/admin/users/${user._id}" class="button">
+        Voir le profil utilisateur
+      </a>
+    </p>
+    
+    <div class="note">
+      <p><strong>Actions recommandées :</strong></p>
+      <ol>
+        <li>Analyser les raisons de la désabonnement</li>
+        <li>Envoyer un email de suivi si approprié</li>
+        <li>Proposer une offre de fidélisation si disponible</li>
+      </ol>
+    </div>
+  `;
+  
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Équipe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmail,
+    subject: `[Annulation] ${user.name} - Plan ${plan.name}`,
+    html: this.getBaseTemplate(adminName, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification d'annulation envoyée à l'admin ${adminEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email notification admin:', error);
+  }
+}
 // Email de rappel avant expiration (7 jours avant)
 async sendDashboardExpirationReminderEmail(email, name, dashboards) {
   const dashboardList = dashboards.map(dashboard => {
@@ -438,9 +938,7 @@ async sendDashboardExpirationReminderEmail(email, name, dashboards) {
             minute: '2-digit'
           })}
         </p>
-        <p style="margin: 5px 0; color: #856404; font-size: 14px;">
-          <a href="${dashboard.url}" style="color: #6e8efb; text-decoration: none;">Accéder au tableau de bord</a>
-        </p>
+      
       </div>
     `;
   }).join('');

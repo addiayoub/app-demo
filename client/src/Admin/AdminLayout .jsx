@@ -14,15 +14,18 @@ import {
   Plus,
   ChevronDown,
   LineChart,
-  CreditCard
+  CreditCard,
+  Folder
 } from 'lucide-react';
 import User_admin from './User_admin';
 import PowerBIDashboard from './PowerBIDashboard';
+import CategoriesManager from './CategoriesManager'; // Import du composant CategoriesManager
 import { useAuth } from '../Auth/AuthContext';
 import axios from 'axios';
 
 import NotificationBell from './NotificationBell';
 import PricingAdmin from './PricingAdmin';
+
 const AdminLayout = () => {
   const [activeComponent, setActiveComponent] = useState('users');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -36,7 +39,7 @@ const AdminLayout = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [cleanupStats, setCleanupStats] = useState(null);
   const navigate = useNavigate();
-const pageContentRef = useRef(null);
+  const pageContentRef = useRef(null);
 
   const sidebarVariants = {
     open: { width: 250 },
@@ -116,13 +119,6 @@ const performManualCleanup = async () => {
     }
   };
 
-  // Fonction pour vérifier les dashboards expirés sans les supprimer
-
-  // useEffect pour le nettoyage automatique toutes les 30 secondes
-// Remplacer votre useEffect actuel par celui-ci :
-
-// Remplacez votre useEffect actuel par celui-ci :
-
 useEffect(() => {
   // Fonction qui combine vérification et nettoyage
   const performAutomaticCleanupCycle = async () => {
@@ -145,8 +141,6 @@ useEffect(() => {
     clearInterval(interval);
   };
 }, []);
-
-// Alternative: Si vous voulez plus de contrôle, vous pouvez aussi faire :
 
 useEffect(() => {
   const performAutomaticCleanupCycle = async () => {
@@ -206,8 +200,6 @@ useEffect(() => {
   };
 }, []);
 
-
-
   const getAvatarUrl = (avatar, name) => {
     if (!avatar) {
       return `https://api.dicebear.com/7.x/initials/svg?seed=${name || 'default'}`;
@@ -247,7 +239,6 @@ useEffect(() => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-    {/* Sidebar */}
 <motion.div
   initial="open"
   animate={isSidebarOpen ? "open" : "closed"}
@@ -314,30 +305,58 @@ useEffect(() => {
           )}
         </AnimatePresence>
       </motion.button>
-<motion.button
-  onClick={() => setActiveComponent('pricing')}
-  className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
-    activeComponent === 'pricing' 
-      ? 'bg-blue-700 text-white shadow-md' 
-      : 'hover:bg-blue-700/50 text-white/90'
-  }`}
-  whileHover={{ scale: 1.02 }}
-  whileTap={{ scale: 0.98 }}
->
-  <CreditCard size={20} className="flex-shrink-0" />
-  <AnimatePresence>
-    {(isSidebarOpen || isHovered) && (
-      <motion.span 
-        variants={linkVariants}
-        initial="closed"
-        animate={isSidebarOpen || isHovered ? "open" : "closed"}
-        className="ml-3 whitespace-nowrap"
+
+      {/* Nouvelle section Catégories */}
+      <motion.button
+        onClick={() => setActiveComponent('categories')}
+        className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
+          activeComponent === 'categories' 
+            ? 'bg-blue-700 text-white shadow-md' 
+            : 'hover:bg-blue-700/50 text-white/90'
+        }`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
       >
-        Plans Tarifaires
-      </motion.span>
-    )}
-  </AnimatePresence>
-</motion.button>
+        <Folder size={20} className="flex-shrink-0" />
+        <AnimatePresence>
+          {(isSidebarOpen || isHovered) && (
+            <motion.span 
+              variants={linkVariants}
+              initial="closed"
+              animate={isSidebarOpen || isHovered ? "open" : "closed"}
+              className="ml-3 whitespace-nowrap"
+            >
+              Catégories
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
+      <motion.button
+        onClick={() => setActiveComponent('pricing')}
+        className={`cursor-pointer w-full flex items-center p-3 rounded-lg transition-all ${
+          activeComponent === 'pricing' 
+            ? 'bg-blue-700 text-white shadow-md' 
+            : 'hover:bg-blue-700/50 text-white/90'
+        }`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <CreditCard size={20} className="flex-shrink-0" />
+        <AnimatePresence>
+          {(isSidebarOpen || isHovered) && (
+            <motion.span 
+              variants={linkVariants}
+              initial="closed"
+              animate={isSidebarOpen || isHovered ? "open" : "closed"}
+              className="ml-3 whitespace-nowrap"
+            >
+              Plans Tarifaires
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
       <div className="space-y-1">
         <motion.button
           onClick={() => setDashboardsMenuOpen(!dashboardsMenuOpen)}
@@ -391,7 +410,7 @@ useEffect(() => {
                       : 'hover:bg-blue-700/20 text-white/80'
                   }`}
                   whileHover={{ x: 5 }}
-                  title={dashboard.name} // Tooltip pour afficher le nom complet
+                  title={dashboard.name}
                 >
                   <div className="flex items-center min-w-0 flex-1">
                     <BarChart2 size={16} className="flex-shrink-0" />
@@ -453,51 +472,45 @@ useEffect(() => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-    <header className="bg-white shadow-sm z-10">
-  <div className="flex items-center justify-between p-4">
-    <div className="flex items-center space-x-4">
-      {/* Bouton Home animé */}
-<motion.button
-
-    // Animation de sortie avant la navigation
-   onClick={() => 
-      navigate('/')
-    } // Redirection simple vers la racine
-
-  whileHover={{ 
-    scale: 1.1,
-    rotate: 10,
-    transition: { duration: 0.3 }
-  }}
-  whileTap={{ 
-    scale: 0.9,
-    transition: { duration: 0.2 }
-  }}
-  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors cursor-pointer"
-  title="Retour à l'accueil"
->
-  <motion.div
-    animate={{
-      x: [0, 2, -2, 0],
-      transition: { repeat: Infinity, duration: 3 }
-    }}
-  >
-    <Home size={20} />
-  </motion.div>
-</motion.button>
-      
-      <h1 className="text-xl font-semibold text-gray-800">
-        {activeComponent === 'users' && 'Gestion des utilisateurs'}
-        {activeComponent === 'pricing' && 'Plans tarifaires'}
-        {activeComponent === 'dashboard' && 'Tableaux de bord Power BI'}
-        {activeComponent === 'settings' && 'Paramètres'}
-        {activeComponent === 'home' && 'Tableau de bord'}
-      </h1>
-    </div>
+        <header className="bg-white shadow-sm z-10">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center space-x-4">
+              {/* Bouton Home animé */}
+              <motion.button
+                onClick={() => navigate('/')}
+                whileHover={{ 
+                  scale: 1.1,
+                  rotate: 10,
+                  transition: { duration: 0.3 }
+                }}
+                whileTap={{ 
+                  scale: 0.9,
+                  transition: { duration: 0.2 }
+                }}
+                className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors cursor-pointer"
+                title="Retour à l'accueil"
+              >
+                <motion.div
+                  animate={{
+                    x: [0, 2, -2, 0],
+                    transition: { repeat: Infinity, duration: 3 }
+                  }}
+                >
+                  <Home size={20} />
+                </motion.div>
+              </motion.button>
+              
+              <h1 className="text-xl font-semibold text-gray-800">
+                {activeComponent === 'users' && 'Gestion des utilisateurs'}
+                {activeComponent === 'categories' && 'Gestion des catégories'}
+                {activeComponent === 'pricing' && 'Plans tarifaires'}
+                {activeComponent === 'dashboard' && 'Tableaux de bord Power BI'}
+                {activeComponent === 'settings' && 'Paramètres'}
+                {activeComponent === 'home' && 'Tableau de bord'}
+              </h1>
+            </div>
             
             <div className="flex items-center space-x-4">
-            
-              
               <NotificationBell 
                 notifications={notifications}
                 setNotifications={setNotifications}
@@ -537,6 +550,8 @@ useEffect(() => {
             >
               {activeComponent === 'users' ? (
                 <User_admin />
+              ) : activeComponent === 'categories' ? (
+                <CategoriesManager />
               ) : activeComponent === 'pricing' ? (
                 <PricingAdmin/>
               ) : activeComponent === 'dashboard' ? (

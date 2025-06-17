@@ -29,7 +29,24 @@ export const createSubscription = async (planId, paymentMethodId, token) => {
     throw error;
   }
 };
-
+// Ajoutez cette nouvelle fonction dans pricingService.js
+export const startTrialSubscription = async (planId, token) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/pricing/start-trial`,
+      { planId },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error starting trial:', error);
+    throw error;
+  }
+};
 export const cancelSubscription = async (token) => {
   try {
     const response = await axios.post(

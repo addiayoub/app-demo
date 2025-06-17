@@ -558,7 +558,8 @@ const Home = ({ onLogin, isAuthenticated, user, onLogout, onGoToDashboard }) => 
     <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
   </div>
 
-  <PricingSection />
+<PricingSection onOpenAuthModal={openModal} />
+
 </div>
 
             
@@ -690,7 +691,8 @@ const Home = ({ onLogin, isAuthenticated, user, onLogout, onGoToDashboard }) => 
         </div>
       </section>
       <br />
- <PricingSection />
+<PricingSection onOpenAuthModal={openModal} />
+
       {/* Contact Section */}
       <section id="contact" className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

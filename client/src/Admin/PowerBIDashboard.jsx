@@ -4,7 +4,7 @@ import {
   Play, Pause, RotateCcw, Maximize2, Settings, 
   Plus, X, Download, FileText, FileSpreadsheet,
   ChevronLeft, ChevronRight, LayoutDashboard, 
-  BarChart2, PieChart, LineChart, RefreshCw,
+  BarChart2, FolderPlus, LineChart, RefreshCw,
   Edit, Trash2, Save, Check, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -81,7 +81,10 @@ const PowerBIDashboard = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const controls = useAnimation();
-
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   // Fonction pour afficher les notifications (remplace toast)
 const showNotification = (message, type = 'info') => {
   if (type === 'success') {
@@ -92,6 +95,158 @@ const showNotification = (message, type = 'info') => {
     showSuccessAlert('Information', message); // Ou créez une showInfoAlert si besoin
   }
 };
+ // Charger les catégories
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      setCategories(response.data.data || response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      showErrorAlert('Erreur', 'Impossible de charger les catégories');
+    }
+  };
+    // Créer une nouvelle catégorie
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) {
+      showErrorAlert('Erreur', 'Veuillez entrer un nom de catégorie');
+      return;
+    }
+
+    const loadingAlert = showLoadingAlert('Création de la catégorie...');
+    
+    try {
+      const response = await axios.post('/api/categories', {
+        name: newCategoryName.trim(),
+        isPublic: newIsPublic
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const newCategory = response.data.data || response.data;
+      setCategories(prev => [...prev, newCategory]);
+      setSelectedCategory(newCategory._id);
+      setNewCategoryName('');
+      setShowNewCategoryInput(false);
+      
+      loadingAlert.close();
+      showSuccessAlert('Succès', 'Catégorie créée avec succès');
+    } catch (error) {
+      loadingAlert.close();
+      const errorMessage = error.response?.data?.message || 'Erreur lors de la création de la catégorie';
+      showErrorAlert('Erreur', errorMessage);
+    }
+  };
+const debugDashboardData = (dashboard) => {
+  console.log('Dashboard data:', {
+    id: dashboard._id,
+    name: dashboard.name,
+    categories: dashboard.categories,
+    selectedCategory: selectedCategory
+  });
+};
+  // Ajouter un dashboard avec catégorie
+const addDashboard = async () => {
+  if (!newUrl.trim() || !newName.trim()) {
+    showErrorAlert('Champs manquants', 'Veuillez remplir tous les champs');
+    return;
+  }
+
+  const loadingAlert = showLoadingAlert('Ajout en cours...');
+
+  try {
+    const payload = {
+      name: newName.trim(),
+      url: newUrl.trim(),
+      active: true,
+      isPublic: newIsPublic,
+      categories: selectedCategory ? [selectedCategory] : []
+    };
+
+    console.log('Payload ajout:', payload); // Debug
+    console.log('Selected category pour ajout:', selectedCategory); // Debug
+
+    const response = await axios.post('/api/dashboards', payload, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const newDashboard = response.data.data || response.data;
+    const updatedDashboards = [...dashboards, newDashboard];
+    
+    setDashboards(updatedDashboards);
+    setSelectedDashboard(newDashboard);
+    setNewUrl('');
+    setNewName('');
+    setNewIsPublic(false);
+    setSelectedCategory(''); // Réinitialiser après succès
+    setShowAddForm(false);
+    
+    loadingAlert.close();
+    showSuccessAlert('Ajout réussi!', 'Le nouveau dashboard a été ajouté avec succès');
+  } catch (err) {
+    loadingAlert.close();
+    const errorMessage = err.response?.data?.message || 'Erreur lors de l\'ajout du dashboard';
+    showErrorAlert('Erreur d\'ajout', errorMessage);
+    console.error('Add dashboard error:', err.response?.data || err.message);
+  }
+};
+  // Mettre à jour un dashboard avec catégorie
+ const updateDashboard = async () => {
+  if (!editDashboard?.name.trim() || !editDashboard?.url.trim()) {
+    showErrorAlert('Champs manquants', 'Veuillez remplir tous les champs');
+    return;
+  }
+
+  const loadingAlert = showLoadingAlert('Mise à jour en cours...');
+
+  try {
+    const payload = {
+      name: editDashboard.name.trim(),
+      url: editDashboard.url.trim(),
+      active: editDashboard.active,
+      isPublic: editDashboard.isPublic || false,
+      categories: selectedCategory ? [selectedCategory] : [] // Envoyer comme tableau
+    };
+
+    const response = await axios.put(`/api/dashboards/${editDashboard._id}`, payload, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const updatedDashboard = response.data.data || response.data;
+    
+    // Mettre à jour les dashboards avec la nouvelle version
+    const updatedDashboards = dashboards.map(d => 
+      d._id === updatedDashboard._id ? updatedDashboard : d
+    );
+    
+    setDashboards(updatedDashboards);
+    setSelectedDashboard(updatedDashboard);
+    setEditDashboard(null);
+    
+    loadingAlert.close();
+    showSuccessAlert('Mis à jour!', 'Le dashboard a été modifié avec succès');
+  } catch (err) {
+    loadingAlert.close();
+    const errorMessage = err.response?.data?.message || 'Erreur lors de la mise à jour du dashboard';
+    showErrorAlert('Erreur de mise à jour', errorMessage);
+    console.error('Update dashboard error:', err.response?.data || err.message);
+  }
+};
+
+
 
   // CORRECTION: Fonction pour toggle le statut public/privé
 const handleTogglePublic = async (dashboardId, newIsPublic) => {
@@ -132,121 +287,58 @@ const handleTogglePublic = async (dashboardId, newIsPublic) => {
   }
 };
   // Charger les dashboards au montage
+  // Charger les dashboards et catégories au montage
   useEffect(() => {
-    const fetchDashboards = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get('/api/dashboards', {
+        setIsLoading(true);
+        
+        // Charger les dashboards
+        const dashboardsResponse = await axios.get('/api/dashboards', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           }
         });
         
-        const dashboardsData = response.data.data || response.data;
+        const dashboardsData = dashboardsResponse.data.data || dashboardsResponse.data;
         setDashboards(dashboardsData);
         
         if (dashboardsData && dashboardsData.length > 0) {
           setSelectedDashboard(dashboardsData[0]);
         }
+
+        // Charger les catégories
+        await fetchCategories();
       } catch (err) {
-        setError('Erreur lors du chargement des dashboards');
-        console.error('Fetch dashboards error:', err.response?.data || err.message);
+        setError('Erreur lors du chargement des données');
+        console.error('Fetch data error:', err.response?.data || err.message);
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchDashboards();
+    fetchData();
   }, [setDashboards, setSelectedDashboard]);
 
-  // Ajouter un dashboard
- const addDashboard = async () => {
-  if (!newUrl.trim() || !newName.trim()) {
-    showErrorAlert('Champs manquants', 'Veuillez remplir tous les champs');
-    return;
+  useEffect(() => {
+  if (editDashboard) {
+    // Vérifier si le dashboard a des catégories et les afficher
+    if (editDashboard.categories && editDashboard.categories.length > 0) {
+      // Si c'est un objet complet, prendre l'_id, sinon c'est déjà un ID
+      const categoryId = typeof editDashboard.categories[0] === 'object' 
+        ? editDashboard.categories[0]._id 
+        : editDashboard.categories[0];
+      setSelectedCategory(categoryId);
+      console.log('Setting selected category from dashboard:', categoryId); // Debug
+    } else {
+      setSelectedCategory('');
+    }
+  } else {
+    // CORRECTION: Ne pas réinitialiser selectedCategory quand on n'est pas en mode édition
+    // setSelectedCategory(''); // Supprimez cette ligne
   }
-
-  const loadingAlert = showLoadingAlert('Ajout en cours...');
-
-  try {
-    const payload = {
-      name: newName.trim(),
-      url: newUrl.trim(),
-      active: true,
-      isPublic: newIsPublic
-    };
-
-    const response = await axios.post('/api/dashboards', payload, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const newDashboard = response.data.data || response.data;
-    const updatedDashboards = [...dashboards, newDashboard];
-    
-    setDashboards(updatedDashboards);
-    setSelectedDashboard(newDashboard);
-    setNewUrl('');
-    setNewName('');
-    setNewIsPublic(false);
-    setShowAddForm(false);
-    
-    loadingAlert.close();
-    showSuccessAlert('Ajout réussi!', 'Le nouveau dashboard a été ajouté avec succès');
-  } catch (err) {
-    loadingAlert.close();
-    const errorMessage = err.response?.data?.message || 'Erreur lors de l\'ajout du dashboard';
-    showErrorAlert('Erreur d\'ajout', errorMessage);
-    console.error('Add dashboard error:', err.response?.data || err.message);
-  }
-};
-
-  // Mettre à jour un dashboard
-// Modifier la fonction updateDashboard
-const updateDashboard = async () => {
-  if (!editDashboard?.name.trim() || !editDashboard?.url.trim()) {
-    showErrorAlert('Champs manquants', 'Veuillez remplir tous les champs');
-    return;
-  }
-
-  const loadingAlert = showLoadingAlert('Mise à jour en cours...');
-
-  try {
-    const payload = {
-      name: editDashboard.name.trim(),
-      url: editDashboard.url.trim(),
-      active: editDashboard.active,
-      isPublic: editDashboard.isPublic || false
-    };
-
-    const response = await axios.put(`/api/dashboards/${editDashboard._id}`, payload, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const updatedDashboard = response.data.data || response.data;
-    const updatedDashboards = dashboards.map(d => 
-      d._id === updatedDashboard._id ? updatedDashboard : d
-    );
-    
-    setDashboards(updatedDashboards);
-    setSelectedDashboard(updatedDashboard);
-    setEditDashboard(null);
-    
-    loadingAlert.close();
-    showSuccessAlert('Mis à jour!', 'Le dashboard a été modifié avec succès');
-  } catch (err) {
-    loadingAlert.close();
-    const errorMessage = err.response?.data?.message || 'Erreur lors de la mise à jour du dashboard';
-    showErrorAlert('Erreur de mise à jour', errorMessage);
-    console.error('Update dashboard error:', err.response?.data || err.message);
-  }
-};
-
+}, [editDashboard]);
   // Supprimer un dashboard
 // Modifier la fonction deleteDashboard
 const deleteDashboard = async (id) => {
@@ -564,14 +656,14 @@ return (
       </div>
 
       {/* Form d'ajout/modification */}
-      <AnimatePresence>
+         <AnimatePresence>
         {(showAddForm || editDashboard) && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 overflow-hidden cursor-pointer"
+            className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 overflow-hidden"
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
@@ -585,6 +677,7 @@ return (
                   setNewUrl('');
                   setNewName('');
                   setNewIsPublic(false);
+                  setSelectedCategory('');
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -594,7 +687,7 @@ return (
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nom du Dashboard
                 </label>
                 <input
@@ -605,12 +698,12 @@ return (
                       ? setEditDashboard({...editDashboard, name: e.target.value})
                       : setNewName(e.target.value)
                   }
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border cursor-pointer border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                   placeholder="Ex: Rapport des Ventes"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   URL Power BI
                 </label>
                 <input
@@ -621,12 +714,87 @@ return (
                       ? setEditDashboard({...editDashboard, url: e.target.value})
                       : setNewUrl(e.target.value)
                   }
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 cursor-pointer rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                   placeholder="https://app.powerbi.com/view?r=..."
                 />
               </div>
             </div>
-            
+
+            {/* Section Catégorie */}
+         <div className="mt-4">
+ 
+  <div className="flex gap-2">
+    <select
+      value={selectedCategory}
+      onChange={(e) => {
+        setSelectedCategory(e.target.value);
+        // Debug log
+        console.log('Category changed to:', e.target.value);
+      }}
+      className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+    >
+      <option value="">Sélectionnez une catégorie</option>
+      {categories.map(category => (
+        <option key={category._id} value={category._id}>
+          {category.name} {category.isPublic ? '(Public)' : '(Privé)'}
+        </option>
+      ))}
+    </select>
+    
+    <motion.button
+      type="button"
+      onClick={() => setShowNewCategoryInput(true)}
+      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-2"
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <FolderPlus size={16} />
+      <span className="hidden sm:inline">Nouvelle</span>
+    </motion.button>
+  </div>
+  
+
+  
+  {showNewCategoryInput && (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.2 }}
+      className="mt-3 p-3 bg-gray-50 rounded-lg"
+    >
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+          placeholder="Nom de la nouvelle catégorie"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+        />
+        <motion.button
+          onClick={createCategory}
+          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Plus size={16} />
+          <span className="hidden sm:inline">Créer</span>
+        </motion.button>
+        <motion.button
+          onClick={() => {
+            setShowNewCategoryInput(false);
+            setNewCategoryName('');
+          }}
+          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <X size={16} />
+        </motion.button>
+      </div>
+    </motion.div>
+  )}
+</div>
+
             {/* Section Visibilité */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg gap-3">
               <div className="flex-grow">
@@ -656,7 +824,7 @@ return (
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={editDashboard ? updateDashboard : addDashboard}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg transition-all shadow-md cursor-pointer text-sm sm:text-base"
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg transition-all shadow-md text-sm sm:text-base"
               >
                 {editDashboard ? <Save className="w-4 h-4 sm:w-5 sm:h-5" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5" />}
                 <span>{editDashboard ? 'Enregistrer' : 'Ajouter'}</span>

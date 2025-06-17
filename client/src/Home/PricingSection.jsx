@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaCheck, FaCrown, FaRocket, FaLightbulb, FaGem, FaStar, FaSyncAlt } from 'react-icons/fa';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { getPlans, createSubscription, getUserSubscription } from '../services/pricingService';
+import { getPlans, createSubscription, getUserSubscription, startTrialSubscription } from '../services/pricingService';
 import { useAuth } from '../Auth/AuthContext';
 import CustomLoader from '../CustomLoader/CustomLoader';
+import axios from 'axios';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -134,16 +135,114 @@ const PlanBadge = ({ isRecommended, isPopular, isBestValue }) => {
   );
 };
 
-const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscription, onSubscribe }) => {
+
+const PricingSection = ({ onOpenAuthModal = () => {} }) => {
+  const [plans, setPlans] = useState([]);
+  const [dashboards, setDashboards] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userSubscription, setUserSubscription] = useState(null);
+  const [billingCycle, setBillingCycle] = useState('monthly');
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const { isAuthenticated, token } = useAuth();
+   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [plansResponse, dashboardsResponse, categoriesResponse, subscriptionResponse] = await Promise.all([
+          getPlans(),
+          axios.get('/api/dashboards/public-names'),
+          axios.get('/api/categories/public-names'),
+          isAuthenticated ? getUserSubscription(token) : Promise.resolve(null)
+        ]);
+        
+        setPlans(plansResponse.plans);
+        setDashboards(dashboardsResponse.data?.data || dashboardsResponse.data || []);
+        setCategories(categoriesResponse.data?.data || categoriesResponse.data || []);
+        
+        if (subscriptionResponse) {
+          setUserSubscription(subscriptionResponse.subscription || null);
+        }
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [isAuthenticated, token]);
+
+  const toggleCategoryExpansion = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
+  const handleSubscriptionSuccess = async () => {
+    if (isAuthenticated) {
+      try {
+        const response = await getUserSubscription(token);
+        setUserSubscription(response.subscription || null);
+      } catch (error) {
+        console.error('Error fetching updated subscription:', error);
+      }
+    }
+  };
+
+  const filteredPlans = plans.filter(plan => plan.billingCycle === billingCycle);
+
+  const toggleBillingCycle = () => {
+    setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly');
+  };
+
+  if (loading) {
+    return <CustomLoader/>;
+  }
+const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscription, onSubscribe ,  onOpenAuthModal // Ajoutez cette prop
+}) => {
   const [showCheckout, setShowCheckout] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   const isCurrentPlan = userSubscription?.plan?._id === plan._id;
   const isSubscribed = userSubscription && userSubscription.status === 'active';
+  const { isAuthenticated, token } = useAuth();
+
+ const handleStartTrial = async () => {
+  if (!isAuthenticated) {
+    onOpenAuthModal('login');
+    return;
+  }
+
+  setIsStartingTrial(true);
+  try {
+    const response = await startTrialSubscription(plan._id, token);
+    
+    if (response.success) {
+      onSubscribe();
+      // Afficher une notification de succès
+    } else {
+      // Afficher l'erreur retournée par l'API
+      alert(response.error || "Échec du démarrage de l'essai");
+    }
+  } catch (error) {
+    console.error('Failed to start trial:', error);
+    alert("Une erreur s'est produite");
+  } finally {
+    setIsStartingTrial(false);
+  }
+};
 
   // Calculate yearly savings if monthly plan exists
   const yearlySavings = plan.billingCycle === 'yearly' 
   ? `Économisez ${Math.round((1 - (plan.price / (plan.price * 12))) * 100)}%` 
   : null;
-
+const handleSubscribeClick = () => {
+    if (!isAuthenticated) {
+      onOpenAuthModal('login'); // Ouvrir le modal de connexion
+      return;
+    }
+    setShowCheckout(true); // Afficher le formulaire de paiement si authentifié
+  };
   return (
     <motion.div 
       className={`relative rounded-2xl overflow-hidden border-2 ${
@@ -186,20 +285,78 @@ const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscrip
         
         <p className="text-gray-600 mb-8 text-lg">{plan.description}</p>
         
-        <div className="mb-4">
-          <h4 className="font-semibold text-gray-800 mb-2">Dashboards inclus :</h4>
-          <div className="flex flex-wrap gap-2">
-            {plan.dashboards.map((db, i) => (
-              <motion.span
-                key={i}
-                className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                whileHover={{ scale: 1.05 }}
-              >
-                {db.name}
-              </motion.span>
-            ))}
+                <div className="mb-4">
+            <h4 className="font-semibold text-gray-800 mb-2">Dashboards inclus :</h4>
+            <div className="space-y-3">
+              {categories
+                .filter(category => {
+                  // Check if at least one dashboard in this category is included in the plan
+                  return plan.dashboards?.some(planDashboard => {
+                    const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+                    const fullDashboard = dashboards.find(db => db._id === dashboardId);
+                    
+                    return fullDashboard?.categories?.some(cat => {
+                      const categoryId = typeof cat === 'object' ? cat._id : cat;
+                      return categoryId === category._id;
+                    });
+                  });
+                })
+                .map(category => {
+                  const count = plan.dashboards?.filter(planDashboard => {
+                    const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+                    const fullDashboard = dashboards.find(db => db._id === dashboardId);
+                    
+                    return fullDashboard?.categories?.some(cat => {
+                      const categoryId = typeof cat === 'object' ? cat._id : cat;
+                      return categoryId === category._id;
+                    });
+                  }).length || 0;
+
+                  return (
+                    <div key={category._id} className="flex items-center text-sm text-gray-600">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 mr-2"></span>
+                      {category.name} <span className="ml-1 text-gray-500">({count})</span>
+                    </div>
+                  );
+                })}
+              
+              {/* Show uncategorized dashboards if any */}
+              {(() => {
+                const uncategorizedDashboards = plan.dashboards?.filter(planDashboard => {
+                  const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+                  const fullDashboard = dashboards.find(db => db._id === dashboardId);
+                  
+                  return !fullDashboard?.categories || fullDashboard.categories.length === 0;
+                }) || [];
+                
+                if (uncategorizedDashboards.length === 0) return null;
+
+                return (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="w-2 h-2 rounded-full bg-gray-500 mr-2"></span>
+                    Sans catégorie <span className="ml-1 text-gray-500">({uncategorizedDashboards.length})</span>
+                  </div>
+                );
+              })()}
+              
+              {/* Show total if no categories found */}
+              {categories.filter(category => {
+                return plan.dashboards?.some(planDashboard => {
+                  const dashboardId = typeof planDashboard === 'object' ? planDashboard._id : planDashboard;
+                  const fullDashboard = dashboards.find(db => db._id === dashboardId);
+                  return fullDashboard?.categories?.some(cat => {
+                    const categoryId = typeof cat === 'object' ? cat._id : cat;
+                    return categoryId === category._id;
+                  });
+                });
+              }).length === 0 && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                  Total dashboards <span className="ml-1 text-gray-500">({plan.dashboards?.length || 0})</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         
         <ul className="space-y-4 mb-8 flex-grow cursor-pointer">
           {plan.features.map((feature, i) => (
@@ -220,22 +377,23 @@ const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscrip
         </ul>
         
         <div className="mt-auto">
-          <AnimatePresence>
-            {showCheckout ? (
-              <Elements stripe={stripePromise}>
-                <CheckoutForm 
-                  plan={plan} 
-                  onSuccess={() => {
-                    setShowCheckout(false);
-                    onSubscribe();
-                  }} 
-                  onClose={() => setShowCheckout(false)} 
-                />
-              </Elements>
-            ) : (
+             <AnimatePresence>
+          {showCheckout ? (
+            <Elements stripe={stripePromise}>
+              <CheckoutForm 
+                plan={plan} 
+                onSuccess={() => {
+                  setShowCheckout(false);
+                  onSubscribe();
+                }} 
+                onClose={() => setShowCheckout(false)} 
+              />
+            </Elements>
+          ) : (
+            <div className="space-y-3">
               <motion.button
-                onClick={() => setShowCheckout(true)}
-                disabled={isCurrentPlan}
+                onClick={handleStartTrial}
+  disabled={isCurrentPlan || isStartingTrial || userSubscription?.trialUsed}
                 className={`w-full cursor-pointer ${
                   isRecommended 
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700' 
@@ -247,73 +405,34 @@ const PricingCard = ({ plan, isRecommended, isPopular, isBestValue, userSubscrip
                 } text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:hover:shadow-lg text-lg`}
                 whileHover={isCurrentPlan ? {} : { scale: 1.02 }}
                 whileTap={isCurrentPlan ? {} : { scale: 0.98 }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
               >
-                {isCurrentPlan 
-                  ? 'Votre plan actuel' 
-                  : isSubscribed 
-                    ? 'Changer de plan' 
-                    : "Commencer l'essai"}
+               {isStartingTrial 
+    ? 'Démarrage en cours...' 
+    : isCurrentPlan 
+      ? 'Votre plan actuel' 
+      : userSubscription?.trialUsed
+        ? 'Essai déjà utilisé'
+        : "Commencer l'essai"}
               </motion.button>
-            )}
-          </AnimatePresence>
+
+              {!isCurrentPlan && (
+                <motion.button
+                  onClick={() => setShowCheckout(true)}
+                  className="w-full border border-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-300 hover:bg-gray-50"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Acheter maintenant
+                </motion.button>
+              )}
+            </div>
+          )}
+        </AnimatePresence>
         </div>
       </div>
     </motion.div>
   );
 };
-
-const PricingSection = () => {
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [userSubscription, setUserSubscription] = useState(null);
-  const [billingCycle, setBillingCycle] = useState('monthly');
-  const { isAuthenticated, token } = useAuth();
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [plansResponse, subscriptionResponse] = await Promise.all([
-          getPlans(),
-          isAuthenticated ? getUserSubscription(token) : Promise.resolve(null)
-        ]);
-        
-        setPlans(plansResponse.plans);
-        if (subscriptionResponse) {
-          setUserSubscription(subscriptionResponse.subscription || null);
-        }
-      } catch (error) {
-        console.error('Error fetching pricing data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [isAuthenticated, token]);
-
-  const handleSubscriptionSuccess = async () => {
-    if (isAuthenticated) {
-      try {
-        const response = await getUserSubscription(token);
-        setUserSubscription(response.subscription || null);
-      } catch (error) {
-        console.error('Error fetching updated subscription:', error);
-      }
-    }
-  };
-
-  const filteredPlans = plans.filter(plan => plan.billingCycle === billingCycle);
-
-  const toggleBillingCycle = () => {
-    setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly');
-  };
-
-  if (loading) {
-    return <CustomLoader/>;
-  }
 
   return (
   <section id="pricing" className="bg-gradient-to-b from-white to-blue-50">
@@ -420,14 +539,15 @@ const PricingSection = () => {
                 damping: 15
               }}
             >
-              <PricingCard 
-                plan={plan} 
-                isRecommended={plan.name === 'Pro' && plan.billingCycle === 'monthly'}
-                isPopular={plan.name === 'Entreprise' && plan.billingCycle === 'monthly'}
-                isBestValue={plan.name === 'Pro' && plan.billingCycle === 'yearly'}
-                userSubscription={userSubscription}
-                onSubscribe={handleSubscriptionSuccess}
-              />
+             <PricingCard 
+  plan={plan} 
+  isRecommended={plan.name === 'Pro' && plan.billingCycle === 'monthly'}
+  isPopular={plan.name === 'Entreprise' && plan.billingCycle === 'monthly'}
+  isBestValue={plan.name === 'Pro' && plan.billingCycle === 'yearly'}
+  userSubscription={userSubscription}
+  onSubscribe={handleSubscriptionSuccess}
+  onOpenAuthModal={onOpenAuthModal} // Passez la fonction depuis les props
+/>
             </motion.div>
           ))}
         </motion.div>

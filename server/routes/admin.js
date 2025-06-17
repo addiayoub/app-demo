@@ -31,7 +31,16 @@ router.post('/users/:id/avatar', upload.single('avatar'), adminController.upload
 router.get('/users/:userId/dashboards', isAuthenticated, isAdmin, adminController.getUserDashboards);
 router.post('/users/:userId/assign', isAuthenticated, isAdmin, adminController.assignDashboards);
 router.post('/users/:userId/unassign', isAuthenticated, isAdmin, adminController.unassignDashboards);
+// Routes pour l'assignation des plans
+router.get('/plans', adminController.getAvailablePlans);
+router.post('/users/:userId/assign-plan', adminController.assignPlanToUser);
+router.get('/users/:userId/plans', isAuthenticated, isAdmin, adminController.getUserPlans);
+router.post('/users/:userId/cancel-plan', adminController.cancelPlan);
 
+// Routes pour l'assignation des plans
+router.get('/plans', adminController.getAvailablePlans);
+router.get('/plans/:id', adminController.getPlanById); // Add this line
+router.post('/users/:userId/assign-plan', adminController.assignPlanToUser);
 // Routes de statistiques et recherche
 router.get('/stats', adminController.getUserStats);
 router.get('/search', adminController.searchUsers);

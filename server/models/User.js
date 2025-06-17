@@ -45,9 +45,14 @@
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+    enum: ['user', 'admin', 'pro', 'enterprise'], // Added pro and enterprise roles
       default: 'user'
     },
+      allowedDashboards: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Dashboard',
+    default: [] // This ensures it's always an array
+  },
  dashboards: [{
   dashboard: {
     type: mongoose.Schema.Types.ObjectId,
