@@ -7,8 +7,8 @@ import DashboardViewer from './DashboardViewer';
 import EmptyState from './EmptyState';
 import AnimatedDashboardSidebar from './AnimatedDashboardSidebar';
 import PlanInfoView from './PlanInfoView';
-import PricingSection from '../home/PricingSection';
 import { useNavigate } from 'react-router-dom';
+import PricingSection from '../Home/PricingSection';
 
 // Composant principal UserDashboard avec gestion des accès
 const UserDashboard = () => {
