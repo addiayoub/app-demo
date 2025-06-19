@@ -516,40 +516,63 @@ const fetchAllDashboards = async () => {
           onShowTickets={handleShowTickets} // Passez la fonction au sidebar
           setShowTicketSection={setShowTicketSection}
         />
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          {showPlanInfo ? (
-            <div className="p-6">
-              <PlanInfoView plan={currentPlan} onClose={() => setShowPlanInfo(false)} user={user} />
-            </div>
-          ) : showPricingSection ? (
-            <div className="p-6">
-              <PricingSection onOpenAuthModal={handleOpenAuthModal} onSubscribe={handleSubscriptionSuccess} />
-            </div>
-          ) : showTicketSection ? (
-            <div className="p-6">
-              <TicketSection /> {/* Affichez le composant TicketSection */}
-            </div>
-          ) : selectedDashboard ? (
-            <div className="p-6">
-              <DashboardViewer
-                dashboard={selectedDashboard}
-                user={user}
-                setSelectedDashboard={setSelectedDashboard}
-              />
-            </div>
-          ) : (
-            <div className="p-4 lg:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-                  <LayoutDashboard className="inline-block mr-2 w-6 h-6 text-gray-700" />
-                  Dashboards Disponibles
-                </h1>
-                <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
-              </div>
-              <PricingSection onOpenAuthModal={handleOpenAuthModal} />
-            </div>
-          )}
-        </div>
+<div className="flex-1 overflow-y-auto overflow-x-hidden">
+  {showPlanInfo ? (
+    <div className="p-6">
+      <PlanInfoView 
+        plan={currentPlan} 
+        onClose={() => {
+          setShowPlanInfo(false);
+          setShowTicketSection(false);
+        }} 
+        user={user}
+        onShowPricing={() => {
+          setShowPlanInfo(false);
+          setShowPricingSection(true);
+          setShowTicketSection(false);
+          setSelectedDashboard(null);
+        }}
+      />
+    </div>
+  ) : showPricingSection ? (
+    <div className="p-6">
+      <PricingSection 
+        onOpenAuthModal={handleOpenAuthModal} 
+        onSubscribe={handleSubscriptionSuccess}
+        onClose={() => {
+          setShowPricingSection(false);
+          setShowPlanInfo(false);
+        }}
+      />
+    </div>
+  ) : showTicketSection ? (
+    <div className="p-6">
+      <TicketSection />
+    </div>
+  ) : selectedDashboard ? (
+    <div className="p-6">
+      <DashboardViewer
+        dashboard={selectedDashboard}
+        user={user}
+        setSelectedDashboard={setSelectedDashboard}
+      />
+    </div>
+  ) : (
+    <div className="p-4 lg:p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+          <LayoutDashboard className="inline-block mr-2 w-6 h-6 text-gray-700" />
+          Dashboards Disponibles
+        </h1>
+        <img src="/ID&A TECH .png" alt="Logo ID&A TECH" className="h-6 lg:h-8 w-auto" />
+      </div>
+      <PricingSection 
+        onOpenAuthModal={handleOpenAuthModal}
+        onSubscribe={handleSubscriptionSuccess}
+      />
+    </div>
+  )}
+</div>
       </div>
     </motion.div>
   );

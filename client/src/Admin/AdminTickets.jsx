@@ -262,7 +262,6 @@ const calculateLocalStats = () => {
    const addReplyToTicket = async (ticketId, content) => {
   try {
     setIsSubmittingReply(true);
-    const loadingAlert = showLoadingAlert('Envoi en cours...');
     
     const response = await fetch(`${API_URL}/api/admin/tickets/${ticketId}/reply`, {
       method: 'POST',
@@ -272,7 +271,6 @@ const calculateLocalStats = () => {
     });
 
     if (!response.ok) {
-      loadingAlert.close();
       showErrorAlert('Erreur', 'Échec de l\'envoi de la réponse');
       throw new Error('Erreur lors de l\'envoi');
     }
@@ -283,7 +281,6 @@ const calculateLocalStats = () => {
     setTickets(prev => prev.map(t => t._id === ticketId ? updatedTicket : t));
     setSelectedTicket(updatedTicket);
     
-    loadingAlert.close();
     showSuccessAlert('Envoyé!', 'Votre réponse a été envoyée avec succès');
     
     return updatedTicket;

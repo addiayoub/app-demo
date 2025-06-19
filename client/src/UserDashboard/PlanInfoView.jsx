@@ -27,7 +27,7 @@ import {
 } from 'react-icons/fa';
 import { GiArtificialIntelligence } from 'react-icons/gi';
 
-const PlanInfoView = ({ plan, onClose, user }) => {
+const PlanInfoView = ({ plan, onClose, onShowPricing ,user }) => {
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [hoveredFeature, setHoveredFeature] = useState(null);
@@ -724,13 +724,14 @@ const AnalogClock = ({ seconds, isActive = true, isCanceled = false, isExpired =
             Vous n'avez pas d'abonnement actif. Souscrivez à un plan premium pour débloquer des fonctionnalités exclusives et des outils puissants.
           </p>
           <div className="flex gap-4">
-            <motion.button 
-              whileHover={{ scale: 1.03, boxShadow: "0 5px 15px -5px rgba(99, 102, 241, 0.5)" }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium"
-            >
-              Voir les plans
-            </motion.button>
+              <motion.button 
+    whileHover={{ scale: 1.03, boxShadow: "0 5px 15px -5px rgba(99, 102, 241, 0.5)" }}
+    whileTap={{ scale: 0.97 }}
+    className="bg-gradient-to-r cursor-pointer from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium"
+    onClick={onShowPricing} // Ajoutez cette ligne
+  >
+    Voir les plans
+  </motion.button>
             <motion.button 
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
