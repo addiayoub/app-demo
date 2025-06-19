@@ -5,9 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, UserPlus, UserX, UserCheck, Edit, Trash2, 
   BarChart2, CreditCard, LineChart, RefreshCw, Search,
-  ChevronDown, ChevronUp, Loader2,
-  LogOut,
-  Settings
+  ChevronDown, ChevronUp, Loader2, Clock, Activity, Eye, Calendar, User
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -25,74 +23,185 @@ const User_admin = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showDashboardAssignment, setShowDashboardAssignment] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  // États pour les tableaux de bord
   const [dashboards, setDashboards] = useState([]);
   const [assignedDashboards, setAssignedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
-const [showPlanAssignment, setShowPlanAssignment] = useState(false);
-const [selectedUserIdForPlan, setSelectedUserIdForPlan] = useState(null);
-const [allUserPlans, setAllUserPlans] = useState({}); // { userId: plans[] }
+  const [showPlanAssignment, setShowPlanAssignment] = useState(false);
+  const [selectedUserIdForPlan, setSelectedUserIdForPlan] = useState(null);
+  const [allUserPlans, setAllUserPlans] = useState({});
+  const [plans, setPlans] = useState([]);
+  const [userPlans, setUserPlans] = useState([]);
+  const [userActivities, setUserActivities] = useState([]);
+  const [activityStats, setActivityStats] = useState({});
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [selectedUserForActivity, setSelectedUserForActivity] = useState(null);
 
-const [plans, setPlans] = useState([]);
-const [userPlans, setUserPlans] = useState([]);
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     role: 'user',
     password: ''
   });
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     admins: 0,
     regularUsers: 0,
     inactiveUsers: 0
   });
+
   const [chartData, setChartData] = useState({
     roles: [],
     activity: []
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
-  // États pour l'avatar
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-const fetchAllUserPlans = async (userIds) => {
-  try {
-    const plansPromises = userIds.map(async (userId) => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
-          credentials: 'include',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+
+  const fetchUserActivities = async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/activities`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch activities');
+      
+      const data = await response.json();
+      setUserActivities(data.activities);
+    } catch (error) {
+      console.error('Error fetching user activities:', error);
+      toast.error('Failed to fetch activities');
+    }
+  };
+
+  const fetchActivityStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/activity-stats`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch activity stats');
+      
+      const data = await response.json();
+      setActivityStats(data.stats);
+    } catch (error) {
+      console.error('Error fetching activity stats:', error);
+      toast.error('Failed to fetch activity stats');
+    }
+  };
+
+  const handleViewActivities = (userId) => {
+    setSelectedUserForActivity(userId);
+    setShowActivityModal(true);
+    fetchUserActivities(userId);
+  };
+
+  const activityChartOption = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    legend: {
+      data: ['Views', 'Edits', 'Logins']
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: userActivities.map(a => new Date(a.createdAt).toLocaleDateString())
+    },
+    yAxis: {
+      type: 'value'
+    },
+    series: [
+      {
+        name: 'Views',
+        type: 'bar',
+        data: userActivities.map(a => a.action === 'view' ? 1 : 0)
+      },
+      {
+        name: 'Edits',
+        type: 'bar',
+        data: userActivities.map(a => a.action === 'edit' ? 1 : 0)
+      },
+      {
+        name: 'Logins',
+        type: 'bar',
+        data: userActivities.map(a => a.action === 'login' ? 1 : 0)
+      }
+    ]
+  };
+
+  const timeSpentChartOption = {
+    tooltip: {
+      trigger: 'item'
+    },
+    series: [
+      {
+        name: 'Time Spent',
+        type: 'pie',
+        radius: '70%',
+        data: userActivities
+          .filter(a => a.duration)
+          .map(a => ({
+            value: a.duration,
+            name: a.dashboardId ? `Dashboard: ${a.dashboardId.name}` : 'Other'
+          }))
+      }
+    ]
+  };
+
+  const fetchAllUserPlans = async (userIds) => {
+    try {
+      const plansPromises = userIds.map(async (userId) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
+            credentials: 'include',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (!response.ok) {
+            console.warn(`Error loading plans for user ${userId}`);
+            return { userId, plans: [] };
           }
-        });
-        
-        if (!response.ok) {
-          console.warn(`Erreur lors du chargement des plans pour l'utilisateur ${userId}`);
+          
+          const data = await response.json();
+          return { userId, plans: data.plans || [] };
+        } catch (error) {
+          console.warn(`Error loading plans for user ${userId}:`, error);
           return { userId, plans: [] };
         }
-        
-        const data = await response.json();
-        return { userId, plans: data.plans || [] };
-      } catch (error) {
-        console.warn(`Erreur lors du chargement des plans pour l'utilisateur ${userId}:`, error);
-        return { userId, plans: [] };
-      }
-    });
+      });
 
-    const results = await Promise.all(plansPromises);
-    const plansMap = {};
-    
-    results.forEach(({ userId, plans }) => {
-      plansMap[userId] = plans;
-    });
-    
-    setAllUserPlans(plansMap);
-  } catch (error) {
-    console.error('Erreur lors du chargement des plans utilisateurs:', error);
-  }
-};
+      const results = await Promise.all(plansPromises);
+      const plansMap = {};
+      
+      results.forEach(({ userId, plans }) => {
+        plansMap[userId] = plans;
+      });
+      
+      setAllUserPlans(plansMap);
+    } catch (error) {
+      console.error('Error loading user plans:', error);
+    }
+  };
 
   const handleAssignDashboards = (userId) => {
     setSelectedUserId(userId);
@@ -100,7 +209,6 @@ const fetchAllUserPlans = async (userIds) => {
     fetchAssignedDashboards(userId);
   };
 
-  // Fonction pour charger les tableaux de bord
   const fetchDashboards = async () => {
     try {
       setLoadingDashboards(true);
@@ -111,247 +219,213 @@ const fetchAllUserPlans = async (userIds) => {
         }
       });
       
-      if (!response.ok) throw new Error('Échec du chargement des tableaux de bord');
+      if (!response.ok) throw new Error('Failed to load dashboards');
       
       const data = await response.json();
       setDashboards(data.data || []);
     } catch (error) {
-      console.error('Erreur lors du chargement des tableaux de bord:', error);
-      toast.error('Échec du chargement des tableaux de bord');
+      console.error('Error loading dashboards:', error);
+      toast.error('Failed to load dashboards');
     } finally {
       setLoadingDashboards(false);
     }
   };
 
-const assignDashboard = async (dashboardId, expiresAt) => {
-  try {
-    const loadingAlert = showLoadingAlert('Assignation en cours...');
+  const assignDashboard = async (dashboardId, expiresAt) => {
+    try {
+      const loadingAlert = showLoadingAlert('Assigning...');
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/assign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          dashboardAssignments: [{
+            dashboardId,
+            expiresAt: expiresAt ? expiresAt.toISOString() : null,
+          }],
+        }),
+      });
 
-    // Envoyer la date telle quelle sans conversion UTC
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/assign`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({
-        dashboardAssignments: [{
-          dashboardId,
-          expiresAt: expiresAt ? expiresAt.toISOString() : null,
-        }],
-      }),
-    });
+      if (!response.ok) throw new Error('Assignment failed');
+      const result = await response.json();
+      loadingAlert.close();
+      await fetchUsers();
+      await fetchAssignedDashboards(selectedUserId);
+      showSuccessAlert('Assigned!', 'Dashboard assigned successfully');
+    } catch (error) {
+      showErrorAlert('Error', 'Failed to assign dashboard');
+    }
+  };
 
+  const unassignDashboard = async (dashboardId) => {
+    try {
+      const loadingAlert = showLoadingAlert('Removing...');
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/unassign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ dashboardIds: [dashboardId] }),
+      });
 
-    if (!response.ok) throw new Error('Échec de l\'assignation');
+      if (!response.ok) throw new Error('Removal failed');
+      const result = await response.json();
+      loadingAlert.close();
+      await fetchUsers();
+      await fetchAssignedDashboards(selectedUserId);
+      showSuccessAlert('Removed!', 'Dashboard removed successfully');
+    } catch (error) {
+      showErrorAlert('Error', 'Failed to remove dashboard');
+    }
+  };
 
-    const result = await response.json();
-    loadingAlert.close();
+  const fetchPlans = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/pricing/plans`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to load plans');
+      
+      const data = await response.json();
+      setPlans(data.plans || []);
+    } catch (error) {
+      console.error('Error loading plans:', error);
+      toast.error('Failed to load plans');
+    }
+  };
 
-    await fetchUsers();
-    await fetchAssignedDashboards(selectedUserId);
+  const fetchUserPlans = async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to load user plans');
+      
+      const data = await response.json();
+      setUserPlans(data.plans || []);
+    } catch (error) {
+      console.error('Error loading user plans:', error);
+      toast.error('Failed to load user plans');
+      setUserPlans([]);
+    }
+  };
 
-    showSuccessAlert('Assigné!', 'Tableau de bord assigné avec succès');
-  } catch (error) {
-    showErrorAlert('Erreur', 'Échec de l\'assignation du tableau de bord');
-  }
-};
+  const assignPlan = async (planId) => {
+    try {
+      const loadingAlert = showLoadingAlert('Assigning...');
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/assign-plan`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ planId })
+      });
 
-const unassignDashboard = async (dashboardId) => {
-  try {
-    const loadingAlert = showLoadingAlert('Retrait en cours...');
+      if (!response.ok) throw new Error('Plan assignment failed');
+      const result = await response.json();
+      loadingAlert.close();
+      await fetchUserPlans(selectedUserIdForPlan);
+      const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
+      setAllUserPlans(prev => ({
+        ...prev,
+        [selectedUserIdForPlan]: updatedPlans
+      }));
+      await fetchUsers();
+      showSuccessAlert('Assigned!', 'Plan assigned successfully');
+    } catch (error) {
+      showErrorAlert('Error', 'Failed to assign plan');
+    }
+  };
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserId}/unassign`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ dashboardIds: [dashboardId] }),
-    });
+  const cancelPlan = async (planId) => {
+    try {
+      const loadingAlert = showLoadingAlert('Canceling...');
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/cancel-plan`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ planId })
+      });
 
-    if (!response.ok) throw new Error('Échec du retrait');
+      if (!response.ok) throw new Error('Plan cancellation failed');
+      const result = await response.json();
+      loadingAlert.close();
+      await fetchUserPlans(selectedUserIdForPlan);
+      const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
+      setAllUserPlans(prev => ({
+        ...prev,
+        [selectedUserIdForPlan]: updatedPlans
+      }));
+      await fetchUsers();
+      showSuccessAlert('Canceled!', 'Plan canceled successfully');
+    } catch (error) {
+      showErrorAlert('Error', 'Failed to cancel plan');
+    }
+  };
 
-    const result = await response.json();
-    loadingAlert.close();
+  const handleAssignPlans = (userId) => {
+    setSelectedUserIdForPlan(userId);
+    setShowPlanAssignment(true);
+    const existingPlans = allUserPlans[userId];
+    if (existingPlans) {
+      setUserPlans(existingPlans);
+    } else {
+      fetchUserPlans(userId);
+    }
+  };
 
-    await fetchUsers();
-    await fetchAssignedDashboards(selectedUserId);
-
-    showSuccessAlert('Retiré!', 'Tableau de bord retiré avec succès');
-  } catch (error) {
-    showErrorAlert('Erreur', 'Échec du retrait du tableau de bord');
-  }
-};
-const fetchPlans = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/pricing/plans`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Échec du chargement des plans');
-    
-    const data = await response.json();
-    setPlans(data.plans || []);
-  } catch (error) {
-    console.error('Erreur lors du chargement des plans:', error);
-    toast.error('Échec du chargement des plans');
-  }
-};
-
-const fetchUserPlans = async (userId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/plans`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Échec du chargement des plans utilisateur');
-    
-    const data = await response.json();
-    setUserPlans(data.plans || []);
-  } catch (error) {
-    console.error('Erreur lors du chargement des plans utilisateur:', error);
-    toast.error('Échec du chargement des plans utilisateur');
-    setUserPlans([]);
-  }
-};
-
-const assignPlan = async (planId) => {
-  try {
-    const loadingAlert = showLoadingAlert('Assignation en cours...');
-    
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/assign-plan`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ planId })
-    });
-
-    if (!response.ok) throw new Error('Échec de l\'assignation du plan');
-
-    const result = await response.json();
-    loadingAlert.close();
-
-    // Mettre à jour les plans de l'utilisateur dans allUserPlans
-    await fetchUserPlans(selectedUserIdForPlan);
-    const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
-    setAllUserPlans(prev => ({
-      ...prev,
-      [selectedUserIdForPlan]: updatedPlans
-    }));
-    
-    await fetchUsers();
-
-    showSuccessAlert('Assigné!', 'Plan assigné avec succès');
-  } catch (error) {
-    showErrorAlert('Erreur', 'Échec de l\'assignation du plan');
-  }
-};
-const cancelPlan = async (planId) => {
-  try {
-    const loadingAlert = showLoadingAlert('Annulation en cours...');
-    
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${selectedUserIdForPlan}/cancel-plan`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ planId })
-    });
-
-    if (!response.ok) throw new Error('Échec de l\'annulation du plan');
-
-    const result = await response.json();
-    loadingAlert.close();
-
-    // Mettre à jour les plans de l'utilisateur dans allUserPlans
-    await fetchUserPlans(selectedUserIdForPlan);
-    const updatedPlans = await fetchUserPlans(selectedUserIdForPlan);
-    setAllUserPlans(prev => ({
-      ...prev,
-      [selectedUserIdForPlan]: updatedPlans
-    }));
-    
-    await fetchUsers();
-
-    showSuccessAlert('Annulé!', 'Plan annulé avec succès');
-  } catch (error) {
-    showErrorAlert('Erreur', 'Échec de l\'annulation du plan');
-  }
-};
-
-const handleAssignPlans = (userId) => {
-  setSelectedUserIdForPlan(userId);
-  setShowPlanAssignment(true);
-  
-  // Utiliser les plans déjà chargés ou les recharger si nécessaire
-  const existingPlans = allUserPlans[userId];
-  if (existingPlans) {
-    setUserPlans(existingPlans);
-  } else {
-    fetchUserPlans(userId);
-  }
-};
-
-useEffect(() => {
-  fetchPlans();
-}, []);
-useEffect(() => {
-  if (selectedUserId) {
-    setAssignedDashboards([]);
-    fetchAssignedDashboards(selectedUserId);
-  } else {
-    setAssignedDashboards([]);
-  }
-}, [selectedUserId]);
-
-const fetchAssignedDashboards = async (userId) => {
-  try {
-    setLoadingDashboards(true);
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/dashboards`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-
-    if (!response.ok) throw new Error('Échec du chargement des tableaux assignés');
-
-    const data = await response.json();
-    setAssignedDashboards(data.dashboards || []);
-  } catch (error) {
-    console.error('Erreur lors du chargement des tableaux assignés:', error);
-    toast.error('Échec du chargement des tableaux assignés');
-    setAssignedDashboards([]);
-  } finally {
-    setLoadingDashboards(false);
-  }
-};
-
-  // Charger les tableaux de bord au montage
   useEffect(() => {
-    fetchDashboards();
+    fetchPlans();
   }, []);
 
-  // Charger les tableaux assignés quand un utilisateur est sélectionné
   useEffect(() => {
     if (selectedUserId) {
+      setAssignedDashboards([]);
       fetchAssignedDashboards(selectedUserId);
+    } else {
+      setAssignedDashboards([]);
     }
   }, [selectedUserId]);
+
+  const fetchAssignedDashboards = async (userId) => {
+    try {
+      setLoadingDashboards(true);
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/dashboards`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to load assigned dashboards');
+      const data = await response.json();
+      setAssignedDashboards(data.dashboards || []);
+    } catch (error) {
+      console.error('Error loading assigned dashboards:', error);
+      toast.error('Failed to load assigned dashboards');
+      setAssignedDashboards([]);
+    } finally {
+      setLoadingDashboards(false);
+    }
+  };
 
   const uploadAvatarFile = async (file, userId) => {
     const formData = new FormData();
@@ -369,7 +443,7 @@ const fetchAssignedDashboards = async (userId) => {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `Échec de l'upload de l'avatar : ${response.status}`);
+        throw new Error(errorData.message || `Avatar upload failed: ${response.status}`);
       }
       
       const data = await response.json();
@@ -378,7 +452,7 @@ const fetchAssignedDashboards = async (userId) => {
         user: data.user
       };
     } catch (error) {
-      console.error('Erreur upload avatar:', error);
+      console.error('Avatar upload error:', error);
       throw error;
     }
   };
@@ -399,14 +473,13 @@ const fetchAssignedDashboards = async (userId) => {
     return avatar;
   };
 
-  // Gérer la sélection de fichier
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         Swal.fire({
-          title: 'Erreur!',
-          text: 'La taille du fichier dépasse la limite de 5 Mo',
+          title: 'Error!',
+          text: 'File size exceeds 5MB limit',
           icon: 'error',
           confirmButtonText: 'OK',
           confirmButtonColor: '#3b82f6'
@@ -423,7 +496,6 @@ const fetchAssignedDashboards = async (userId) => {
     }
   };
 
-  // Variantes d'animation
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -453,7 +525,6 @@ const fetchAssignedDashboards = async (userId) => {
     tap: { scale: 0.98 }
   };
 
-  // Filtrage des utilisateurs
   const filteredUsers = users.filter(user => 
     user && user.name && user.email && (
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -461,59 +532,56 @@ const fetchAssignedDashboards = async (userId) => {
     )
   );
 
-  // Charger les utilisateurs et les statistiques
   useEffect(() => {
     fetchUsers();
     fetchStats();
+    fetchActivityStats();
   }, []);
 
   const fetchUsers = async () => {
-  try {
-    setLoading(true);
-    const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return;
       }
-    });
-    
-    if (response.status === 401) {
-      logout();
-      return;
+      
+      if (!response.ok) throw new Error('Failed to load users');
+      
+      const data = await response.json();
+      const usersData = data || [];
+      setUsers(usersData);
+      updateChartData(usersData);
+      
+      if (usersData.length > 0) {
+        const userIds = usersData.map(user => user._id);
+        await fetchAllUserPlans(userIds);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      toast.error('Failed to load users');
+      setLoading(false);
     }
-    
-    if (!response.ok) throw new Error('Échec du chargement des utilisateurs');
-    
-    const data = await response.json();
-    const usersData = data || [];
-    setUsers(usersData);
-    updateChartData(usersData);
-    
-    // Charger les plans pour tous les utilisateurs
-    if (usersData.length > 0) {
-      const userIds = usersData.map(user => user._id);
-      await fetchAllUserPlans(userIds);
-    }
-    
-    setLoading(false);
-  } catch (error) {
-    console.error('Erreur lors du chargement des utilisateurs:', error);
-    toast.error('Échec du chargement des utilisateurs');
-    setLoading(false);
-  }
-};
-const getActivePlansCount = (userId) => {
-  const userPlans = allUserPlans[userId] || [];
-  return userPlans.filter(userPlan => {
-    if (!userPlan.currentPeriodEnd) return true; // Plan sans date d'expiration
-    
-    const endDate = new Date(userPlan.currentPeriodEnd);
-    const now = new Date();
-    
-    return userPlan.status !== 'canceled' && endDate >= now;
-  }).length;
-};
+  };
 
+  const getActivePlansCount = (userId) => {
+    const userPlans = allUserPlans[userId] || [];
+    return userPlans.filter(userPlan => {
+      if (!userPlan.currentPeriodEnd) return true;
+      const endDate = new Date(userPlan.currentPeriodEnd);
+      const now = new Date();
+      return userPlan.status !== 'canceled' && endDate >= now;
+    }).length;
+  };
 
   const fetchStats = async () => {
     try {
@@ -524,7 +592,7 @@ const getActivePlansCount = (userId) => {
         }
       });
       
-      if (!response.ok) throw new Error('Échec du chargement des statistiques');
+      if (!response.ok) throw new Error('Failed to load stats');
       
       const data = await response.json();
       setStats({
@@ -534,19 +602,17 @@ const getActivePlansCount = (userId) => {
         inactiveUsers: data.stats.totalUsers - data.stats.verifiedUsers
       });
     } catch (error) {
-      console.error('Erreur lors du chargement des statistiques:', error);
-      toast.error('Échec du chargement des statistiques');
+      console.error('Error loading stats:', error);
+      toast.error('Failed to load stats');
     }
   };
 
-  // Mettre à jour les données des graphiques
   const updateChartData = (usersData) => {
     if (!Array.isArray(usersData) || usersData.length === 0) {
       setChartData({ roles: [], activity: [] });
       return;
     }
 
-    // Grouper par rôle
     const roleData = usersData.reduce((acc, user) => {
       if (user && user.role) {
         acc[user.role] = (acc[user.role] || 0) + 1;
@@ -554,7 +620,6 @@ const getActivePlansCount = (userId) => {
       return acc;
     }, {});
 
-    // Grouper par mois pour l'activité
     const monthlyData = usersData.reduce((acc, user) => {
       if (user && user.createdAt) {
         const date = new Date(user.createdAt);
@@ -588,13 +653,11 @@ const getActivePlansCount = (userId) => {
     });
   };
 
-  // Supprimer un utilisateur
   const handleDeleteUser = async (userId) => {
     const userToDelete = users.find(u => u._id === userId);
     showDeleteConfirmation(userToDelete.name, async () => {
       try {
-        const loadingAlert = showLoadingAlert('Suppression en cours...');
-        
+        const loadingAlert = showLoadingAlert('Deleting...');
         const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
           method: 'DELETE',
           credentials: 'include',
@@ -604,22 +667,20 @@ const getActivePlansCount = (userId) => {
         });
         
         if (!response.ok) {
-          throw new Error(`Erreur HTTP! statut: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         loadingAlert.close();
-        
         setUsers(prevUsers => prevUsers.filter(u => u._id !== userId));
         fetchStats();
-        showSuccessAlert('Supprimé!', 'Utilisateur supprimé avec succès');
+        showSuccessAlert('Deleted!', 'User deleted successfully');
       } catch (error) {
-        showErrorAlert('Erreur', 'Échec de la suppression de l\'utilisateur');
-        console.error('Erreur lors de la suppression:', error);
+        showErrorAlert('Error', 'Failed to delete user');
+        console.error('Delete error:', error);
       }
     });
   };
 
-  // Commencer l'édition d'un utilisateur
   const startEditing = (user) => {
     setEditingUser(user);
     setShowAddForm(false);
@@ -631,14 +692,12 @@ const getActivePlansCount = (userId) => {
     });
   };
 
-  // Afficher le formulaire d'ajout
   const showAddUserForm = () => {
     setEditingUser(null);
     setShowAddForm(true);
     setFormData({ name: '', email: '', role: 'user', password: '' });
   };
 
-  // Masquer les formulaires
   const hideForms = () => {
     setEditingUser(null);
     setShowAddForm(false);
@@ -647,20 +706,17 @@ const getActivePlansCount = (userId) => {
     setSelectedFile(null);
   };
 
-  // Gérer les changements d'input
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Mettre à jour un utilisateur
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      const loadingAlert = showLoadingAlert('Mise à jour en cours...');
-      
+      const loadingAlert = showLoadingAlert('Updating...');
       let avatarUrl = formData.avatar;
       if (selectedFile) {
         const uploadResult = await uploadAvatarFile(selectedFile, editingUser._id);
@@ -688,23 +744,20 @@ const getActivePlansCount = (userId) => {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Échec de la mise à jour');
+        throw new Error(errorData.message || 'Update failed');
       }
       
       const result = await response.json();
       loadingAlert.close();
-      
       setUsers(prevUsers => 
         prevUsers.map(u => u._id === editingUser._id ? result.user : u)
       );
-      
       updateChartData(users.map(u => u._id === editingUser._id ? result.user : u));
       hideForms();
-      
-      showSuccessAlert('Succès!', 'Utilisateur mis à jour avec succès');
+      showSuccessAlert('Success!', 'User updated successfully');
       fetchStats();
     } catch (error) {
-      showErrorAlert('Erreur', error.message || 'Échec de la mise à jour');
+      showErrorAlert('Error', error.message || 'Update failed');
     } finally {
       setIsSubmitting(false);
       setAvatarPreview('');
@@ -712,14 +765,12 @@ const getActivePlansCount = (userId) => {
     }
   };
 
-  // Créer un nouvel utilisateur
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      const loadingAlert = showLoadingAlert('Création en cours...');
-      
+      const loadingAlert = showLoadingAlert('Creating...');
       let createData = { ...formData };
       if (selectedFile && avatarPreview) {
         createData.avatar = avatarPreview;
@@ -737,26 +788,23 @@ const getActivePlansCount = (userId) => {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Échec de la création');
+        throw new Error(errorData.message || 'Creation failed');
       }
       
       const result = await response.json();
       loadingAlert.close();
-      
       setUsers(prevUsers => [...prevUsers, result.user]);
       updateChartData([...users, result.user]);
       hideForms();
-      
-      showSuccessAlert('Succès!', 'Utilisateur créé avec succès');
+      showSuccessAlert('Success!', 'User created successfully');
       fetchStats();
     } catch (error) {
-      showErrorAlert('Erreur', error.message || 'Échec de la création');
+      showErrorAlert('Error', error.message || 'Creation failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Configuration du graphique des rôles
   const userRoleChart = {
     backgroundColor: 'transparent',
     animationDuration: 2000,
@@ -772,7 +820,7 @@ const getActivePlansCount = (userId) => {
     },
     series: [
       {
-        name: 'Rôles Utilisateurs',
+        name: 'User Roles',
         type: 'pie',
         radius: ['50%', '70%'],
         avoidLabelOverlap: false,
@@ -807,7 +855,6 @@ const getActivePlansCount = (userId) => {
     ]
   };
 
-  // Configuration du graphique d'activité
   const userActivityChart = {
     backgroundColor: 'transparent',
     animationDuration: 2000,
@@ -819,13 +866,13 @@ const getActivePlansCount = (userId) => {
       formatter: function(params) {
         return `
           <strong>${params[0].axisValue}</strong><br/>
-          Nouveaux Utilisateurs: <b>${params[0].data}</b><br/>
-          Utilisateurs Actifs: <b>${params[1].data}</b>
+          New Users: <b>${params[0].data}</b><br/>
+          Active Users: <b>${params[1].data}</b>
         `;
       }
     },
     legend: {
-      data: ['Nouveaux Utilisateurs', 'Utilisateurs Actifs'],
+      data: ['New Users', 'Active Users'],
       bottom: 0
     },
     grid: {
@@ -865,7 +912,7 @@ const getActivePlansCount = (userId) => {
     },
     series: [
       {
-        name: 'Nouveaux Utilisateurs',
+        name: 'New Users',
         type: 'bar',
         barWidth: '40%',
         data: chartData.activity.map(d => d.newUsers),
@@ -877,15 +924,15 @@ const getActivePlansCount = (userId) => {
           return idx * 100;
         },
         markLine: {
-          data: [{ type: 'average', name: 'Moyenne' }],
+          data: [{ type: 'average', name: 'Average' }],
           label: {
             position: 'end',
-            formatter: 'Moy: {c}'
+            formatter: 'Avg: {c}'
           }
         }
       },
       {
-        name: 'Utilisateurs Actifs',
+        name: 'Active Users',
         type: 'line',
         smooth: true,
         data: chartData.activity.map(d => d.activeUsers),
@@ -902,41 +949,40 @@ const getActivePlansCount = (userId) => {
           return idx * 100 + 100;
         },
         markLine: {
-          data: [{ type: 'average', name: 'Moyenne' }],
+          data: [{ type: 'average', name: 'Average' }],
           label: {
             position: 'end',
-            formatter: 'Moy: {c}'
+            formatter: 'Avg: {c}'
           }
         }
       }
     ]
   };
 
-  // Cartes de statistiques
   const statsCards = [
     { 
-      title: 'Total Utilisateurs', 
+      title: 'Total Users', 
       value: stats.totalUsers, 
       icon: <Users size={24} />, 
       color: 'bg-blue-100 text-blue-600',
       trend: stats.totalUsers > 0 ? 'up' : 'stable'
     },
     { 
-      title: 'Administrateurs', 
+      title: 'Admins', 
       value: stats.admins, 
       icon: <UserCheck size={24} />, 
       color: 'bg-green-100 text-green-600',
       trend: 'stable'
     },
     { 
-      title: 'Utilisateurs Standards', 
+      title: 'Regular Users', 
       value: stats.regularUsers, 
       icon: <UserPlus size={24} />, 
       color: 'bg-purple-100 text-purple-600',
       trend: stats.regularUsers > 0 ? 'up' : 'stable'
     },
     { 
-      title: 'Utilisateurs Inactifs', 
+      title: 'Inactive Users', 
       value: stats.inactiveUsers, 
       icon: <UserX size={24} />, 
       color: 'bg-red-100 text-red-600',
@@ -952,7 +998,6 @@ const getActivePlansCount = (userId) => {
       className="min-h-screen bg-gray-50"
     >
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Cartes de Statistiques */}
         <motion.div 
           variants={containerVariants}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
@@ -994,12 +1039,11 @@ const getActivePlansCount = (userId) => {
           ))}
         </motion.div>
 
-        {/* Section des Graphiques */}
         <motion.section 
           variants={containerVariants}
           className="mb-8"
         >
-          <h2 className="text-xl font-semibold mb-4">Analyses</h2>
+          <h2 className="text-xl font-semibold mb-4">Analytics</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <motion.div 
               variants={itemVariants}
@@ -1007,7 +1051,7 @@ const getActivePlansCount = (userId) => {
               whileHover={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Activité Utilisateurs (6 derniers mois)</h3>
+                <h3 className="text-lg font-semibold">User Activity (Last 6 Months)</h3>
                 <motion.button 
                   className="p-2 rounded-lg hover:bg-gray-100"
                   onClick={fetchStats}
@@ -1030,7 +1074,7 @@ const getActivePlansCount = (userId) => {
               whileHover={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Répartition des Rôles</h3>
+                <h3 className="text-lg font-semibold">Role Distribution</h3>
                 <motion.button 
                   className="p-2 rounded-lg hover:bg-gray-100"
                   onClick={fetchUsers}
@@ -1048,7 +1092,7 @@ const getActivePlansCount = (userId) => {
             </motion.div>
           </div>
         </motion.section>
-{/* Section de Gestion des Utilisateurs */}
+
         <motion.section 
           variants={itemVariants}
           className="bg-white rounded-xl shadow-sm overflow-hidden"
@@ -1057,12 +1101,12 @@ const getActivePlansCount = (userId) => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
               <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
                 <div className="relative w-full md:w-64">
-                  <div className="absolute inset-y-0 left-0 pl-3  flex items-center pointer-events-none cursor-pointer">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none cursor-pointer">
                     <Search size={18} className="text-gray-400" />
                   </div>
                   <input
                     type="text"
-                    placeholder="Rechercher des utilisateurs..."
+                    placeholder="Search users..."
                     className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -1074,13 +1118,12 @@ const getActivePlansCount = (userId) => {
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <UserPlus size={18} className="mr-2 " />
+                  <UserPlus size={18} className="mr-2" />
                 </motion.button>
               </div>
             </div>
           </div>
 
-          {/* Formulaire Utilisateur - Apparaît lors de l'édition ou de l'ajout */}
           <AnimatePresence>
             {(editingUser !== null || showAddForm) && (
               <motion.div 
@@ -1091,83 +1134,75 @@ const getActivePlansCount = (userId) => {
                 className="p-6 border-b border-gray-200"
               >
                 <h3 className="text-md font-medium mb-4 cursor-pointer">
-                  {editingUser ? 'Modifier l\'Utilisateur' : 'Créer un Nouvel Utilisateur'}
+                  {editingUser ? 'Edit User' : 'Create New User'}
                 </h3>
                 <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-       <motion.div
-  initial={{ opacity: 0, x: -20 }}
-  animate={{ opacity: 1, x: 0 }}
-  transition={{ delay: 0.5 }}
->
-  <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
-  <div className="flex items-center space-x-4">
-    {/* Aperçu de l'avatar */}
-    <div className="flex-shrink-0">
-  <img 
-  src={avatarPreview || getAvatarUrl(formData.avatar, formData.name)}
-  alt="Aperçu de l'avatar" 
-  className="h-16 w-16 rounded-full border-2 border-gray-200 object-cover"
-/>
-    </div>
-    
-    {/* Container pour les inputs */}
-    <div className="flex-1 space-y-2">
-      {/* Input file pour téléchargement */}
-      <div>
-        <input
-          type="file"
-          id="avatar-upload"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <label
-          htmlFor="avatar-upload"
-          className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          Choisir un fichier
-        </label>
-        {selectedFile && (
-          <span className="ml-2 text-sm text-gray-500">
-            {selectedFile.name}
-          </span>
-        )}
-      </div>
-      
-      {/* Séparateur */}
-      <div className="flex items-center">
-        <div className="flex-1 border-t border-gray-200"></div>
-        <span className="px-2 text-xs text-gray-400">OU</span>
-        <div className="flex-1 border-t border-gray-200"></div>
-      </div>
-      
-      {/* Input URL pour lien externe */}
-      <input
-        type="url"
-        name="avatar"
-        value={formData.avatar || ''}
-        onChange={(e) => {
-          handleInputChange(e);
-          setAvatarPreview('');
-          setSelectedFile(null);
-        }}
-        placeholder="Coller l'URL d'une image"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-      />
-    </div>
-  </div>
-</motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={avatarPreview || getAvatarUrl(formData.avatar, formData.name)}
+                            alt="Avatar preview" 
+                            className="h-16 w-16 rounded-full border-2 border-gray-200 object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div>
+                            <input
+                              type="file"
+                              id="avatar-upload"
+                              accept="image/*"
+                              onChange={handleFileChange}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="avatar-upload"
+                              className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              Choose file
+                            </label>
+                            {selectedFile && (
+                              <span className="ml-2 text-sm text-gray-500">
+                                {selectedFile.name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center">
+                            <div className="flex-1 border-t border-gray-200"></div>
+                            <span className="px-2 text-xs text-gray-400">OR</span>
+                            <div className="flex-1 border-t border-gray-200"></div>
+                          </div>
+                          <input
+                            type="url"
+                            name="avatar"
+                            value={formData.avatar || ''}
+                            onChange={(e) => {
+                              handleInputChange(e);
+                              setAvatarPreview('');
+                              setSelectedFile(null);
+                            }}
+                            placeholder="Paste image URL"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
 
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.1 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                       <input
                         type="text"
                         name="name"
@@ -1197,15 +1232,15 @@ const getActivePlansCount = (userId) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                       <select
                         name="role"
                         value={formData.role}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 cursor-pointer focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="user">Utilisateur</option>
-                        <option value="admin">Administrateur</option>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
                       </select>
                     </motion.div>
                     <motion.div
@@ -1214,7 +1249,7 @@ const getActivePlansCount = (userId) => {
                       transition={{ delay: 0.4 }}
                     >
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {editingUser ? 'Nouveau Mot de Passe (laisser vide pour conserver)' : 'Mot de Passe'}
+                        {editingUser ? 'New Password (leave blank to keep)' : 'Password'}
                       </label>
                       <input
                         type="password"
@@ -1235,7 +1270,7 @@ const getActivePlansCount = (userId) => {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      Annuler
+                      Cancel
                     </motion.button>
                     <motion.button
                       type="submit"
@@ -1247,12 +1282,12 @@ const getActivePlansCount = (userId) => {
                       {isSubmitting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Traitement en cours...
+                          Processing...
                         </>
                       ) : editingUser ? (
-                        'Mettre à Jour l\'Utilisateur'
+                        'Update User'
                       ) : (
-                        'Créer l\'Utilisateur'
+                        'Create User'
                       )}
                     </motion.button>
                   </div>
@@ -1261,15 +1296,14 @@ const getActivePlansCount = (userId) => {
             )}
           </AnimatePresence>
 
-          {/* Tableau des Utilisateurs */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -1279,14 +1313,14 @@ const getActivePlansCount = (userId) => {
                     <td colSpan="5" className="px-6 py-8 text-center">
                       <div className="flex justify-center items-center space-x-2">
                         <Loader2 size={20} className="animate-spin" />
-                        <span>Chargement des utilisateurs...</span>
+                        <span>Loading users...</span>
                       </div>
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                      Aucun utilisateur trouvé correspondant à vos critères
+                      No users found matching your criteria
                     </td>
                   </tr>
                 ) : (
@@ -1301,28 +1335,26 @@ const getActivePlansCount = (userId) => {
                         whileHover={{ backgroundColor: 'rgba(243, 244, 246, 0.5)' }}
                         className="hover:bg-gray-50"
                       >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10">
-                                <img 
-                                  className="h-10 w-10 rounded-full object-cover" 
-                                  src={getAvatarUrl(user.avatar, user.name)}
-                                  alt={`Avatar de ${user.name}`}
-                                  onError={(e) => {
-                                    // Fallback si l'image ne charge pas
-                                    e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${user.name || 'default'}`;
-                                  }}
-                                />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  Inscrit le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
-                                </div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <img 
+                                className="h-10 w-10 rounded-full object-cover" 
+                                src={getAvatarUrl(user.avatar, user.name)}
+                                alt={`${user.name}'s avatar`}
+                                onError={(e) => {
+                                  e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${user.name || 'default'}`;
+                                }}
+                              />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                              <div className="text-xs text-gray-500">
+                                Joined {new Date(user.createdAt).toLocaleDateString('fr-FR')}
                               </div>
                             </div>
-                          </td>
-                       
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {user.email}
                         </td>
@@ -1332,7 +1364,7 @@ const getActivePlansCount = (userId) => {
                               ${user.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
                             whileHover={{ scale: 1.05 }}
                           >
-                            {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                            {user.role === 'admin' ? 'Admin' : 'User'}
                           </motion.span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1341,7 +1373,7 @@ const getActivePlansCount = (userId) => {
                               ${user.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}
                             whileHover={{ scale: 1.05 }}
                           >
-                            {user.isVerified ? 'Vérifié' : 'En attente'}
+                            {user.isVerified ? 'Verified' : 'Pending'}
                           </motion.span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1349,51 +1381,59 @@ const getActivePlansCount = (userId) => {
                             <motion.button
                               onClick={() => startEditing(user)}
                               className="text-blue-600 hover:text-blue-900 cursor-pointer p-1 rounded hover:bg-blue-50"
-                              title="Modifier"
+                              title="Edit"
                               whileHover={{ scale: 1.2 }}
                               whileTap={{ scale: 0.9 }}
                             >
                               <Edit size={18} />
                             </motion.button>
-                       
-<div className="relative inline-block">
-  <motion.button
-    onClick={() => handleAssignDashboards(user._id)}
-    className="text-purple-600 hover:text-purple-900 p-2 rounded hover:bg-purple-50 cursor-pointer transition-colors duration-200"
-    title="Assigner des Tableaux de Bord"
-    whileHover={{ scale: 1.1 }}
-    whileTap={{ scale: 0.95 }}
-  >
-    <BarChart2 size={18} />
-    {/* Badge pour les tableaux de bord assignés */}
-    {(assignedDashboards.length > 0 || (user.dashboards && user.dashboards.length > 0)) && (
-      <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
-        {selectedUserId === user._id ? assignedDashboards.length : (user.dashboards?.length || 0)}
-      </span>
-    )}
-  </motion.button>
-  
-  <motion.button
-    onClick={() => handleAssignPlans(user._id)}
-    className="text-green-600 hover:text-green-900 p-2 rounded hover:bg-green-50 cursor-pointer transition-colors duration-200"
-    title="Gérer les plans"
-    whileHover={{ scale: 1.1 }}
-    whileTap={{ scale: 0.95 }}
-  >
-    <CreditCard size={18} />
-    {/* Badge pour afficher seulement le nombre de plans actifs */}
-    {getActivePlansCount(user._id) > 0 && (
-      <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
-        {getActivePlansCount(user._id)}
-      </span>
-    )}
-  </motion.button>
-</div>
+                            
+                            <motion.button
+                              onClick={() => handleViewActivities(user._id)}
+                              className="text-indigo-600 hover:text-indigo-900 cursor-pointer p-1 rounded hover:bg-indigo-50"
+                              title="View Activities"
+                              whileHover={{ scale: 1.2 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <Activity size={18} />
+                            </motion.button>
+
+                            <div className="relative inline-block">
+                              <motion.button
+                                onClick={() => handleAssignDashboards(user._id)}
+                                className="text-purple-600 hover:text-purple-900 p-2 rounded hover:bg-purple-50 cursor-pointer transition-colors duration-200"
+                                title="Assign Dashboards"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <BarChart2 size={18} />
+                                {(assignedDashboards.length > 0 || (user.dashboards && user.dashboards.length > 0)) && (
+                                  <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm border-2 border-white">
+                                    {selectedUserId === user._id ? assignedDashboards.length : (user.dashboards?.length || 0)}
+                                  </span>
+                                )}
+                              </motion.button>
+                              
+                              <motion.button
+                                onClick={() => handleAssignPlans(user._id)}
+                                className="text-green-600 hover:text-green-900 p-2 rounded hover:bg-green-50 cursor-pointer transition-colors duration-200"
+                                title="Manage Plans"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <CreditCard size={18} />
+                                {getActivePlansCount(user._id) > 0 && (
+                                  <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
+                                    {getActivePlansCount(user._id)}
+                                  </span>
+                                )}
+                              </motion.button>
+                            </div>
                             {user._id !== currentUser?._id && (
                               <motion.button
                                 onClick={() => handleDeleteUser(user._id)}
                                 className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                title="Supprimer"
+                                title="Delete"
                                 whileHover={{ scale: 1.2 }}
                                 whileTap={{ scale: 0.9 }}
                               >
@@ -1406,42 +1446,118 @@ const getActivePlansCount = (userId) => {
                     ))}
                   </AnimatePresence>
                 )}
-
               </tbody>
             </table>
-            
           </div>
 
           {showDashboardAssignment && (
-  <DashboardAssignmentModal
-    userId={selectedUserId}
-    onClose={() => {
-      setShowDashboardAssignment(false);
-      setSelectedUserId(null);
-    }}
-    dashboards={dashboards}
-    assignedDashboards={assignedDashboards}
-    onAssign={assignDashboard}
-    onUnassign={unassignDashboard}
-  />
-)}
-{showPlanAssignment && (
-  <PlanAssignmentModal
-    onClose={() => {
-      setShowPlanAssignment(false);
-      setSelectedUserIdForPlan(null);
-    }}
-    plans={plans}
-    userPlans={userPlans}
-    onAssign={assignPlan}
-    onCancel={cancelPlan}
-  />
-)}
+            <DashboardAssignmentModal
+              userId={selectedUserId}
+              onClose={() => {
+                setShowDashboardAssignment(false);
+                setSelectedUserId(null);
+              }}
+              dashboards={dashboards}
+              assignedDashboards={assignedDashboards}
+              onAssign={assignDashboard}
+              onUnassign={unassignDashboard}
+            />
+          )}
+          {showPlanAssignment && (
+            <PlanAssignmentModal
+              onClose={() => {
+                setShowPlanAssignment(false);
+                setSelectedUserIdForPlan(null);
+              }}
+              plans={plans}
+              userPlans={userPlans}
+              onAssign={assignPlan}
+              onCancel={cancelPlan}
+            />
+          )}
+          {showActivityModal && (
+            <div className="fixed inset-0 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-semibold">User Activities</h3>
+                  <button 
+                    onClick={() => setShowActivityModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    &times;
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h4 className="text-lg font-medium mb-2 flex items-center">
+                      <Activity className="mr-2" /> Activity Overview
+                    </h4>
+                    <ReactECharts 
+                      option={activityChartOption} 
+                      style={{ height: '300px' }} 
+                    />
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h4 className="text-lg font-medium mb-2 flex items-center">
+                      <Clock className="mr-2" /> Time Spent
+                    </h4>
+                    <ReactECharts 
+                      option={timeSpentChartOption} 
+                      style={{ height: '300px' }} 
+                    />
+                  </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h4 className="text-lg font-medium mb-2 flex items-center">
+                    <Eye className="mr-2" /> Recent Activities
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dashboard</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {userActivities.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                              No activities found
+                            </td>
+                          </tr>
+                        ) : (
+                          userActivities.map((activity, index) => (
+                            <tr key={index}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 capitalize">
+                                {activity.action}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {activity.dashboardId?.name || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {activity.duration ? `${activity.duration} sec` : 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(activity.createdAt).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.section>
       </main>
-      
     </motion.div>
-    
   );
 };
 

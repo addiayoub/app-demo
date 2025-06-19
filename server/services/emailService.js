@@ -240,6 +240,9 @@ async sendPlanAssignmentEmail(email, name, plan, dashboards) {
     throw new Error('Erreur lors de l\'envoi de l\'email d\'assignation de plan');
   }
 }
+// Corriger les 3 méthodes problématiques :
+
+
 // Ajoutez ces méthodes à EmailService
 async sendAdminTrialNotification(adminEmail, adminName, user, plan) {
   const content = `
@@ -867,6 +870,250 @@ async sendAdminErrorNotification(adminEmail, adminName, errorType, errorDetails,
     console.log(`Notification d'erreur envoyée à l'admin ${adminEmail}`);
   } catch (error) {
     console.error('Erreur envoi email notification admin:', error);
+  }
+}
+// Ajoutez ces méthodes à votre EmailService existant
+
+// Dans EmailService.js, modifiez ces méthodes :
+
+async sendNewTicketToAdmins(ticket, userName) {
+  try {
+    const admins = await User.find({ role: 'admin' }).select('email name');
+    if (!admins.length) return;
+
+    const adminEmails = admins.map(admin => admin.email);
+    const adminNames = admins.map(admin => admin.name).join(', ');
+
+    const ticketUrl = `${process.env.ADMIN_URL}/tickets/${ticket._id}`;
+    
+    const content = `
+      <p>Un nouveau ticket a été créé par ${userName} :</p>
+      
+      <div style="background: #f8f9fa; border-left: 4px solid #6e8efb; padding: 15px; margin: 20px 0;">
+        <p><strong>Sujet:</strong> ${ticket.subject}</p>
+        <p><strong>Priorité:</strong> ${ticket.priority}</p>
+        <p><strong>Catégorie:</strong> ${ticket.category}</p>
+        <p><strong>Message:</strong></p>
+        <p style="white-space: pre-line;">${ticket.message}</p>
+      </div>
+      
+      <p style="text-align: center;">
+        <a href="${ticketUrl}" class="button">Voir le ticket</a>
+      </p>
+      
+      <p>Connectez-vous à votre tableau de bord admin pour y répondre.</p>
+    `;
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+      to: adminEmails,
+      subject: `[Nouveau Ticket] ${ticket.subject}`,
+      html: this.getBaseTemplate(adminNames, content)
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log('Email de nouveau ticket envoyé aux admins');
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email aux admins:', error);
+  }
+}
+
+async sendAdminReplyEmail(userEmail, userName, ticketSubject, replyContent, ticketId) {
+  try {
+    const ticketUrl = `${process.env.CLIENT_URL}/tickets/${ticketId}`;
+    
+    const content = `
+      <p>Un administrateur a répondu à votre ticket "${ticketSubject}".</p>
+      
+      <div style="background: #e7f5ff; border-left: 4px solid #4dabf7; padding: 15px; margin: 20px 0;">
+        <p style="white-space: pre-line;">${replyContent}</p>
+      </div>
+      
+      <p style="text-align: center;">
+        <a href="${ticketUrl}" class="button">Voir le ticket</a>
+      </p>
+      
+      <p>Vous pouvez répondre à ce ticket en vous connectant à votre compte.</p>
+    `;
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+      to: userEmail,
+      subject: `[Réponse] ${ticketSubject}`,
+      html: this.getBaseTemplate(userName, content)
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email de réponse admin envoyé à ${userEmail}`);
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de réponse:', error);
+  }
+}
+
+async sendTicketStatusEmail(userEmail, userName, ticketSubject, newStatus, ticketId) {
+  try {
+    let statusMessage = '';
+    if (newStatus === 'resolved') {
+      statusMessage = 'a été marqué comme résolu';
+    } else if (newStatus === 'closed') {
+      statusMessage = 'a été fermé';
+    }
+
+    const ticketUrl = `${process.env.CLIENT_URL}/tickets/${ticketId}`;
+    
+    const content = `
+      <p>Votre ticket "${ticketSubject}" ${statusMessage}.</p>
+      
+      <div style="background: #ebfbee; border-left: 4px solid #40c057; padding: 15px; margin: 20px 0;">
+        <p>Si vous avez d'autres questions, n'hésitez pas à créer un nouveau ticket.</p>
+      </div>
+      
+      <p style="text-align: center;">
+        <a href="${ticketUrl}" class="button">Voir le ticket</a>
+      </p>
+      
+      <p>Merci d'avoir utilisé notre service de support.</p>
+    `;
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+      to: userEmail,
+      subject: `[${newStatus === 'resolved' ? 'Résolu' : 'Fermé'}] ${ticketSubject}`,
+      html: this.getBaseTemplate(userName, content)
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Email de statut de ticket envoyé à ${userEmail}`);
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de statut:', error);
+  }
+}
+
+async sendNewTicketNotification(adminEmails, userName, ticket) {
+  const ticketUrl = `${process.env.ADMIN_URL}/tickets/${ticket._id}`;
+  
+  const content = `
+    <p>Un nouveau ticket a été créé par ${userName} :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #6e8efb; padding: 15px; margin: 20px 0;">
+      <p><strong>Sujet :</strong> ${ticket.subject}</p>
+      <p><strong>Priorité :</strong> ${ticket.priority}</p>
+      <p><strong>Catégorie :</strong> ${ticket.category}</p>
+      <p><strong>Message :</strong></p>
+      <p style="white-space: pre-line;">${ticket.message}</p>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${ticketUrl}" class="button">Voir le ticket</a>
+    </p>
+  `;
+
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmails,
+    subject: `[Nouveau Ticket] ${ticket.subject}`,
+    html: this.getBaseTemplate('Administrateur', content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification de nouveau ticket envoyée aux admins`);
+  } catch (error) {
+    console.error('Erreur envoi email notification ticket:', error);
+  }
+}
+
+async sendTicketReplyNotification(adminEmails, userName, ticket, replyContent) {
+  const ticketUrl = `${process.env.ADMIN_URL}/tickets/${ticket._id}`;
+  
+  const content = `
+    <p>Une nouvelle réponse a été ajoutée au ticket "${ticket.subject}" par ${userName} :</p>
+    
+    <div style="background: #f8f9fa; border-left: 4px solid #6e8efb; padding: 15px; margin: 20px 0;">
+      <p style="white-space: pre-line;">${replyContent}</p>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${ticketUrl}" class="button">Voir le ticket</a>
+    </p>
+  `;
+
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: adminEmails,
+    subject: `[Réponse Ticket] ${ticket.subject}`,
+    html: this.getBaseTemplate('Administrateur', content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification de réponse ticket envoyée aux admins`);
+  } catch (error) {
+    console.error('Erreur envoi email notification réponse ticket:', error);
+  }
+}
+
+async sendAdminReplyNotification(userEmail, userName, ticket, replyContent) {
+  const ticketUrl = `${process.env.CLIENT_URL}/tickets/${ticket._id}`;
+  
+  const content = `
+    <p>Notre équipe de support a répondu à votre ticket "${ticket.subject}" :</p>
+    
+    <div style="background: #e7f5ff; border-left: 4px solid #4dabf7; padding: 15px; margin: 20px 0;">
+      <p style="white-space: pre-line;">${replyContent}</p>
+    </div>
+    
+    <p>Vous pouvez répondre directement à cet email ou via l'interface :</p>
+    
+    <p style="text-align: center;">
+      <a href="${ticketUrl}" class="button">Voir le ticket</a>
+    </p>
+  `;
+
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: userEmail,
+    subject: `[Réponse] ${ticket.subject}`,
+    html: this.getBaseTemplate(userName, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification de réponse admin envoyée à ${userEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email réponse admin:', error);
+  }
+}
+
+async sendTicketClosedNotification(userEmail, userName, ticket) {
+  const ticketUrl = `${process.env.CLIENT_URL}/tickets/${ticket._id}`;
+  
+  const content = `
+    <p>Nous confirmons que votre ticket "${ticket.subject}" a été fermé.</p>
+    
+    <div style="background: #ebfbee; border-left: 4px solid #40c057; padding: 15px; margin: 20px 0;">
+      <p>Si vous avez d'autres questions, n'hésitez pas à créer un nouveau ticket.</p>
+    </div>
+    
+    <p style="text-align: center;">
+      <a href="${ticketUrl}" class="button">Voir le ticket</a>
+    </p>
+    
+    <p>Merci d'avoir utilisé notre service de support.</p>
+  `;
+
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME || process.env.APP_NAME || 'Support'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: userEmail,
+    subject: `[Fermé] ${ticket.subject}`,
+    html: this.getBaseTemplate(userName, content)
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    console.log(`Notification de ticket fermé envoyée à ${userEmail}`);
+  } catch (error) {
+    console.error('Erreur envoi email ticket fermé:', error);
   }
 }
 // Email aux admins lorsqu'un abonnement est annulé

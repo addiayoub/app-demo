@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, Search, Filter, BarChart2, ChevronDown, ChevronUp,
   Globe, Lock, Eye, EyeOff, Calendar, RotateCcw, Plus, LogOut,
-  Download, Printer, FileText, FileSliders, FileSignature, AlertCircle,
+  Download, Mail, FileText, FileSliders, FileSignature, AlertCircle,
   Info, Home, Crown, Gem, Rocket, Zap, CheckCircle, ExternalLink, RefreshCw, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthContext';
@@ -11,16 +11,18 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const AnimatedDashboardSidebar = ({ 
-  dashboards = [],
+  dashboards = {},
   isLoading = false,
   searchTerm = '',
   setSearchTerm,
   filters = {},
-  setFilters,
+  setShowTicketSection,
   selectedDashboard,
   setSelectedDashboard,
   resetFilters,
-  setShowPlanInfo 
+  setShowPlanInfo,
+  setShowPricingSection,
+  onShowTickets
 }) => {
   const { user, logout, token } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -30,10 +32,23 @@ const AnimatedDashboardSidebar = ({
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const navigate = useNavigate();
 
-  // New state to track if PricingSection should be shown
-  const [showPricingSection, setShowPricingSection] = useState(false);
+  useEffect(() => {
+    const initialState = {};
+    Object.keys(dashboards).forEach(categoryId => {
+      initialState[categoryId] = true;
+    });
+    setExpandedCategories(initialState);
+  }, [dashboards]);
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
 
   const sidebarVariants = {
     open: { width: 350, transition: { type: 'spring', stiffness: 300, damping: 30 } },
@@ -83,29 +98,29 @@ const AnimatedDashboardSidebar = ({
     };
   }, [hoverTimeout]);
 
- const getDashboardBadge = (dashboard) => {
-  if (dashboard.hasAccess) {
-    if (dashboard.accessType === 'subscription') {
-      return (
-        <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full flex items-center gap-1">
-          <Gem size={10} /> Plan
-        </span>
-      );
-    } else if (dashboard.accessType === 'public') {
-      return (
-        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
-          <Globe size={10} /> Public
-        </span>
-      );
-    } else {
-      return (
-         <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full flex items-center gap-1">
-          <Gem size={10} /> Plan
-        </span>
-      );
+  const getDashboardBadge = (dashboard) => {
+    if (dashboard.hasAccess) {
+      if (dashboard.accessType === 'subscription') {
+        return (
+          <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full flex items-center gap-1">
+            <Gem size={10} /> Plan
+          </span>
+        );
+      } else if (dashboard.accessType === 'public') {
+        return (
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
+            <Globe size={10} /> Public
+          </span>
+        );
+      } else {
+        return (
+          <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full flex items-center gap-1">
+            <Gem size={10} /> Plan
+          </span>
+        );
+      }
     }
-  }
-};
+  };
 
   const getAvatarUrl = (avatar, name) => {
     if (!avatar) {
@@ -116,7 +131,6 @@ const AnimatedDashboardSidebar = ({
     }
     return avatar;
   };
-
 
   const getDashboardStatus = (dashboard) => {
     const dashboardData = dashboard.data || dashboard;
@@ -164,28 +178,27 @@ const AnimatedDashboardSidebar = ({
     }
   };
 
-  // Handler for dashboard clicks
-const handleDashboardClick = (dashboard) => {
-  // Validate dashboard object
+ const handleDashboardClick = (dashboard) => {
   if (!dashboard || typeof dashboard !== 'object') {
     console.error('Invalid dashboard clicked:', dashboard);
     return;
   }
 
-  // Check access rights
   const hasAccess = dashboard.hasAccess && 
                    (!dashboard.expiresAt || new Date(dashboard.expiresAt) > new Date());
 
   if (!hasAccess) {
-    // Show pricing for restricted dashboards
     setShowPricingSection(true);
     setShowPlanInfo(false);
     setSelectedDashboard(null);
+    // Ajoutez cette ligne pour fermer la section tickets
+    setShowTicketSection(false);
   } else {
-    // Show accessible dashboard
     setSelectedDashboard(dashboard);
     setShowPricingSection(false);
     setShowPlanInfo(false);
+    // Ajoutez cette ligne pour fermer la section tickets
+    setShowTicketSection(false);
   }
 };
 
@@ -199,7 +212,6 @@ const handleDashboardClick = (dashboard) => {
       onMouseLeave={handleMouseLeave}
     >
       <div className="flex flex-col h-full">
-        {/* Header avec Logo */}
         <div className="p-5 flex items-center justify-between border-b border-slate-700">
           <AnimatePresence mode="wait">
             {isSidebarOpen ? (
@@ -237,7 +249,6 @@ const handleDashboardClick = (dashboard) => {
           )}
         </div>
 
-        {/* Profil utilisateur */}
         <AnimatePresence>
           {isSidebarOpen && (
             <motion.div
@@ -267,7 +278,6 @@ const handleDashboardClick = (dashboard) => {
           )}
         </AnimatePresence>
 
-        {/* Mode fermé - Avatar seulement */}
         {!isSidebarOpen && (
           <div className="p-4 border-b border-slate-700 flex justify-center">
             <motion.img 
@@ -283,7 +293,6 @@ const handleDashboardClick = (dashboard) => {
           </div>
         )}
 
-        {/* Barre de recherche */}
         <AnimatePresence>
           {isSidebarOpen && (
             <motion.div
@@ -308,7 +317,6 @@ const handleDashboardClick = (dashboard) => {
           )}
         </AnimatePresence>
 
-        {/* Section Mes Plans */}
         <div className="px-4">
           <motion.button
             onClick={() => {
@@ -317,7 +325,7 @@ const handleDashboardClick = (dashboard) => {
                 setShowPricingSection(false);
               }
             }}
-            className="w-full flex items-center justify-between p-3 rounded-lg transition-all hover:bg-slate-700 text-slate-300"
+            className="w-full flex items-center justify-between p-3 rounded-lg transition-all hover:bg-slate-700 cursor-pointer text-slate-300"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -465,142 +473,223 @@ const handleDashboardClick = (dashboard) => {
           </AnimatePresence>
         </div>
 
-        {/* Liste des dashboards */}
-        <div className="flex-1 overflow-y-auto px-4 py-2">
-          <div className="flex items-center justify-between mb-3">
-            <AnimatePresence>
-              {isSidebarOpen && (
-                <motion.h3 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="text-sm font-medium text-slate-300"
-                >
-                  Mes Dashboards ({dashboards.length})
-                </motion.h3>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <motion.div 
-                  key={i} 
-                  className="animate-pulse"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <div className="h-12 bg-slate-700 rounded-lg"></div>
-                </motion.div>
-              ))}
-            </div>
-          ) : dashboards.length === 0 ? (
-            <AnimatePresence>
-              {isSidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 200 }}
-                  className="text-center py-8"
-                >
-                  <BarChart2 size={32} className="mx-auto text-slate-500 mb-2" />
-                  <p className="text-sm text-slate-400">Aucun dashboard trouvé</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          ) : (
-            <div className="space-y-2">
-              {dashboards.map((dashboard, index) => {
-                const dashboardData = dashboard.data || dashboard;
-                const status = getDashboardStatus(dashboard);
-                const isSelected = selectedDashboard?._id === dashboard._id;
-                const hasAccess = dashboard.hasAccess && 
-                  (!dashboard.expiresAt || new Date(dashboard.expiresAt) > new Date());
-
-                return (
-                  <motion.div
-                    key={dashboard._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    layout
+        <div className="px-4">
+          <motion.button
+            onClick={() => {
+              if (isSidebarOpen) {
+                onShowTickets();
+              }
+            }}
+            className="w-full flex items-center justify-between p-3 cursor-pointer rounded-lg transition-all hover:bg-blue-600 text-slate-300"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="flex items-center">
+              <Mail size={18} className="flex-shrink-0" />
+              <AnimatePresence>
+                {isSidebarOpen && (
+                  <motion.span 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="ml-3 whitespace-nowrap"
                   >
-                    <motion.button
-                      onClick={() => handleDashboardClick(dashboard)}
-                      className={`w-full text-left p-3 rounded-lg transition-all group ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                          : hasAccess 
-                            ? 'hover:bg-slate-700 text-slate-300' 
-                            : 'bg-slate-800/50 text-slate-500 cursor-pointer'
-                      }`}
-                      whileHover={{ 
-                        scale: 1.02, 
-                        x: 2 
-                      }}
-                      whileTap={{ scale: 0.98 }}
-                      layout
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`p-1 rounded-lg ${
-                          isSelected 
-                            ? 'bg-white/20' 
-                            : hasAccess 
-                              ? 'bg-slate-600' 
-                              : 'bg-slate-700'
-                        } flex-shrink-0`}>
-                          {hasAccess ? <BarChart2 size={16} /> : <Lock size={16} />}
-                        </div>
-                        <AnimatePresence>
-                          {isSidebarOpen && (
-                            <motion.div 
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ delay: 0.1 }}
-                              className="flex-1 min-w-0"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium truncate text-sm">
-                                    {dashboardData.name}
-                                  </h4>
-                                  {getDashboardBadge(dashboard)}
-                                </div>
-                              </div>
-                              {dashboardData.description && (
-                                <p className="text-xs opacity-75 truncate mt-1">
-                                  {dashboardData.description}
-                                </p>
-                              )}
-                              <div className="flex items-center justify-between mt-2">
-                                <span className={`text-xs ${
-                                  hasAccess 
-                                    ? status.color 
-                                    : 'text-yellow-400'
-                                }`}>
-                                  {hasAccess ? status.text : 'Accès restreint'}
-                                </span>
-                                <span className="text-xs opacity-50">
-                                  {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
-                                    ? new Date(dashboardData.createdAt).toLocaleDateString() 
-                                    : 'Date invalide'}
-                                </span>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </motion.button>
-                  </motion.div>
-                );
-              })}
+                    Support Tickets
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </div>
-          )}
+            {isSidebarOpen && <ExternalLink size={16} />}
+          </motion.button>
         </div>
 
-        {/* Instructions de survol en mode fermé */}
+<div className="flex-1 overflow-y-auto px-4 py-2">
+  <div className="flex items-center justify-between mb-3">
+    <AnimatePresence>
+      {isSidebarOpen && (
+        <motion.h3 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-sm font-medium text-slate-300"
+        >
+          Mes Dashboards
+        </motion.h3>
+      )}
+    </AnimatePresence>
+  </div>
+
+  {isLoading ? (
+    <div className="space-y-2">
+      {[...Array(3)].map((_, i) => (
+        <motion.div 
+          key={i} 
+          className="animate-pulse"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: i * 0.1 }}
+        >
+          <div className="h-12 bg-slate-700 rounded-lg"></div>
+        </motion.div>
+      ))}
+    </div>
+  ) : Object.keys(dashboards).length === 0 ? (
+    <AnimatePresence>
+      {isSidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200 }}
+          className="text-center py-8"
+        >
+          <BarChart2 size={32} className="mx-auto text-slate-500 mb-2" />
+          <p className="text-sm text-slate-400">Aucun dashboard trouvé</p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  ) : (
+    <div className="space-y-4">
+      {Object.entries(dashboards).map(([categoryId, categoryData]) => {
+        if (!categoryData || !categoryData.dashboards || !Array.isArray(categoryData.dashboards)) {
+          console.warn(`Invalid category data for ${categoryId}:`, categoryData);
+          return null;
+        }
+
+        return (
+          <motion.div
+            key={categoryId}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            layout
+          >
+            {isSidebarOpen && (
+              <motion.button 
+                onClick={() => toggleCategory(categoryId)}
+                className="w-full text-left text-xs font-medium text-slate-400 mb-2 px-2 p-2 cursor-pointer flex items-center justify-between"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                whileHover={{ backgroundColor: 'rgba(30, 41, 59, 0.5)' }}
+              >
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
+                  {categoryData.name || 'Sans catégorie'}
+                  <span className="text-xs text-slate-500 ml-2">
+                    ({categoryData.dashboards.length})
+                  </span>
+                </div>
+                <motion.div
+                  animate={{ rotate: expandedCategories[categoryId] ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown size={14} />
+                </motion.div>
+              </motion.button>
+            )}
+            
+            {(expandedCategories[categoryId] || !isSidebarOpen) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="space-y-2 cursor-pointer">
+                  {categoryData.dashboards.map((dashboard, index) => {
+                    if (!dashboard || typeof dashboard !== 'object') {
+                      console.warn(`Invalid dashboard at index ${index}:`, dashboard);
+                      return null;
+                    }
+
+                    const dashboardData = dashboard.data || dashboard;
+                    const status = getDashboardStatus(dashboard);
+                    const isSelected = selectedDashboard?._id === dashboard._id;
+                    const hasAccess = dashboard.hasAccess && 
+                      (!dashboard.expiresAt || new Date(dashboard.expiresAt) > new Date());
+
+                    return (
+                      <motion.div
+                        key={dashboard._id || `dashboard-${index}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        layout
+                      >
+                        <motion.button
+                          onClick={() => handleDashboardClick(dashboard)}
+                          className={`w-full ${isSidebarOpen ? 'text-left' : 'flex justify-center'} p-3 rounded-lg transition-all ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                              : hasAccess
+                                ? 'hover:bg-slate-700 text-slate-300'
+                                : 'bg-slate-800/50 text-slate-500 cursor-pointer'
+                          }`}
+                          whileHover={{ scale: isSidebarOpen ? 1.02 : 1.1 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <div className={`flex ${isSidebarOpen ? 'items-start space-x-3' : 'justify-center'}`}>
+                            <div className={`p-1 rounded-lg ${
+                              isSelected
+                                ? 'bg-white/20'
+                                : hasAccess
+                                  ? 'bg-slate-600'
+                                  : 'bg-slate-700'
+                            } flex-shrink-0`}>
+                              {hasAccess ? <BarChart2 size={16} /> : <Lock size={16} />}
+                            </div>
+
+                            {isSidebarOpen && (
+                              <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.1 }}
+                                className="flex-1 min-w-0"
+                              >
+                                <div className="flex items-center justify-between cursor-pointer">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium truncate text-sm">
+                                      {dashboardData.name || 'Dashboard sans nom'}
+                                    </h4>
+                                    {getDashboardBadge(dashboard)}
+                                  </div>
+                                </div>
+                                {dashboardData.description && (
+                                  <p className="text-xs opacity-75 truncate mt-1">
+                                    {dashboardData.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center justify-between mt-2">
+                                  <span className={`text-xs ${
+                                    hasAccess
+                                      ? status.color
+                                      : 'text-yellow-400'
+                                  }`}>
+                                    {hasAccess ? status.text : 'Accès restreint'}
+                                  </span>
+                                  <span className="text-xs opacity-50">
+                                    {dashboardData.createdAt && !isNaN(new Date(dashboardData.createdAt).getTime()) 
+                                      ? new Date(dashboardData.createdAt).toLocaleDateString() 
+                                      : 'Date invalide'}
+                                  </span>
+                                </div>
+                              </motion.div>
+                            )}
+                          </div>
+                        </motion.button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        );
+      })}
+    </div>
+  )}
+</div>
+
         {!isSidebarOpen && (
           <div className="px-4 py-2">
             <motion.div
@@ -623,7 +712,6 @@ const handleDashboardClick = (dashboard) => {
           </div>
         )}
 
-        {/* Boutons de navigation */}
         <div className="p-4 border-t border-slate-700">
           <motion.button
             onClick={() => navigate('/')}

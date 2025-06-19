@@ -1,65 +1,59 @@
-// services/dashboardNotificationService.js
 const cron = require('node-cron');
 const User = require('../models/User');
 const emailService = require('./emailService');
+const Notification = require('../models/Notification');
 
 class DashboardNotificationService {
   constructor() {
     this.isRunning = false;
   }
 
-  // Démarre les tâches cron
   start() {
     if (this.isRunning) {
-      console.log('Dashboard notification service is already running');
+      console.log('Le service de notification est déjà en cours d\'exécution');
       return;
     }
 
-    console.log('Starting Dashboard Notification Service...');
+    console.log('Démarrage du service de notification...');
     
     // Vérification quotidienne à 9h00 pour les rappels (7 jours avant)
     cron.schedule('0 9 * * *', async () => {
-      console.log('Running daily dashboard expiration reminder check...');
-      await this.checkExpiringDashboards(7); // 7 jours avant
+      console.log('Vérification des dashboards expirant dans 7 jours...');
+      await this.checkExpiringDashboards(7);
     });
 
     // Vérification quotidienne à 18h00 pour les alertes urgentes (24h avant)
     cron.schedule('0 18 * * *', async () => {
-      console.log('Running daily dashboard urgent expiration check...');
-      await this.checkExpiringDashboards(1); // 1 jour avant
+      console.log('Vérification des dashboards expirant dans 24 heures...');
+      await this.checkExpiringDashboards(1);
     });
 
-    // Vérification toutes les heures pour les expirations imminentes (moins de 24h)
+    // Vérification toutes les heures pour les expirations imminentes
     cron.schedule('0 * * * *', async () => {
-      console.log('Running hourly dashboard urgent expiration check...');
-      await this.checkExpiringDashboardsHours(24); // 24 heures avant
+      console.log('Vérification horaire des dashboards expirant bientôt...');
+      await this.checkExpiringDashboardsHours(24);
     });
 
     // Vérification quotidienne à 10h00 pour les dashboards expirés
     cron.schedule('0 10 * * *', async () => {
-      console.log('Running daily expired dashboard check...');
+      console.log('Vérification des dashboards expirés...');
       await this.checkExpiredDashboards();
     });
 
     this.isRunning = true;
-    console.log('Dashboard Notification Service started successfully');
+    console.log('Service de notification démarré avec succès');
   }
 
-  // Arrête les tâches cron
   stop() {
-    // Note: node-cron ne fournit pas de méthode stop globale
-    // Dans un vrai projet, vous pourriez stocker les tâches et les arrêter individuellement
     this.isRunning = false;
-    console.log('Dashboard Notification Service stopped');
+    console.log('Service de notification arrêté');
   }
 
-  // Vérifie les dashboards qui expirent dans X jours
   async checkExpiringDashboards(daysBeforeExpiration) {
     try {
       const now = new Date();
       const checkDate = new Date(now.getTime() + (daysBeforeExpiration * 24 * 60 * 60 * 1000));
       
-      // Chercher les utilisateurs avec des dashboards qui expirent
       const users = await User.find({
         'dashboards.expiresAt': {
           $exists: true,
@@ -69,7 +63,7 @@ class DashboardNotificationService {
         }
       }).populate('dashboards.dashboard');
 
-      console.log(`Found ${users.length} users with dashboards expiring in ${daysBeforeExpiration} days`);
+      console.log(`${users.length} utilisateurs avec des dashboards expirant dans ${daysBeforeExpiration} jours`);
 
       for (const user of users) {
         const expiringDashboards = user.dashboards.filter(d => {
@@ -79,7 +73,6 @@ class DashboardNotificationService {
         });
 
         if (expiringDashboards.length > 0) {
-          // Vérifier si on a déjà envoyé un email pour cette période
           const shouldSend = await this.shouldSendNotification(user._id, expiringDashboards, daysBeforeExpiration);
           
           if (shouldSend) {
@@ -88,6 +81,15 @@ class DashboardNotificationService {
               url: d.dashboard.url,
               expiresAt: d.expiresAt
             }));
+
+            // Créer une notification
+            await Notification.create({
+              user: user._id,
+              title: 'Expiration de dashboard',
+              message: `Certains de vos dashboards expireront dans ${daysBeforeExpiration} jours`,
+              type: 'dashboard_expiration',
+              relatedId: null
+            });
 
             if (daysBeforeExpiration === 7) {
               await emailService.sendDashboardExpirationReminderEmail(
@@ -103,17 +105,15 @@ class DashboardNotificationService {
               );
             }
 
-            // Marquer comme envoyé pour éviter les doublons
             await this.markNotificationSent(user._id, expiringDashboards, daysBeforeExpiration);
           }
         }
       }
     } catch (error) {
-      console.error('Error checking expiring dashboards:', error);
+      console.error('Erreur lors de la vérification des dashboards expirants:', error);
     }
   }
 
-  // Vérifie les dashboards qui expirent dans X heures (pour les alertes urgentes)
   async checkExpiringDashboardsHours(hoursBeforeExpiration) {
     try {
       const now = new Date();
@@ -146,6 +146,15 @@ class DashboardNotificationService {
               expiresAt: d.expiresAt
             }));
 
+            // Créer une notification urgente
+            await Notification.create({
+              user: user._id,
+              title: 'Expiration imminente de dashboard',
+              message: 'Certains de vos dashboards expireront bientôt',
+              type: 'dashboard_expiration',
+              relatedId: null
+            });
+
             await emailService.sendDashboardExpirationUrgentEmail(
               user.email,
               user.name,
@@ -157,11 +166,10 @@ class DashboardNotificationService {
         }
       }
     } catch (error) {
-      console.error('Error checking expiring dashboards (hours):', error);
+      console.error('Erreur lors de la vérification des dashboards expirants (heures):', error);
     }
   }
 
-  // Vérifie les dashboards expirés
   async checkExpiredDashboards() {
     try {
       const now = new Date();
@@ -191,6 +199,15 @@ class DashboardNotificationService {
               expiresAt: d.expiresAt
             }));
 
+            // Créer une notification d'expiration
+            await Notification.create({
+              user: user._id,
+              title: 'Dashboard expiré',
+              message: 'Certains de vos dashboards ont expiré',
+              type: 'dashboard_expiration',
+              relatedId: null
+            });
+
             await emailService.sendDashboardExpiredEmail(
               user.email,
               user.name,
@@ -198,60 +215,33 @@ class DashboardNotificationService {
             );
 
             await this.markNotificationSent(user._id, expiredDashboards, 'expired');
-            
-            // Optionnel: Supprimer les dashboards expirés
-            // await this.removeExpiredDashboards(user._id, expiredDashboards);
           }
         }
       }
     } catch (error) {
-      console.error('Error checking expired dashboards:', error);
+      console.error('Erreur lors de la vérification des dashboards expirés:', error);
     }
   }
 
-  // Vérifie si on doit envoyer une notification (évite les doublons)
   async shouldSendNotification(userId, dashboards, type) {
-    // Implémentez votre logique de vérification des doublons ici
-    // Vous pourriez utiliser une collection séparée pour tracker les notifications envoyées
-    // ou ajouter un champ dans le modèle User pour tracker les dernières notifications
+    // Vérifier si une notification a déjà été envoyée aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Pour simplifier, on retourne true pour l'instant
-    // Dans un vrai projet, vérifiez si une notification a déjà été envoyée aujourd'hui
-    return true;
+    const existingNotification = await Notification.findOne({
+      user: userId,
+      type: 'dashboard_expiration',
+      createdAt: { $gte: today },
+      title: type === 'expired' ? 'Dashboard expiré' : 
+             type === 'urgent' ? 'Expiration imminente de dashboard' : 
+             'Expiration de dashboard'
+    });
+
+    return !existingNotification;
   }
 
-  // Marque une notification comme envoyée
   async markNotificationSent(userId, dashboards, type) {
-    // Implémentez votre logique de marquage ici
-    // Vous pourriez créer une collection 'NotificationLog' ou utiliser un cache Redis
-    console.log(`Notification marked as sent for user ${userId}, type: ${type}`);
-  }
-
-  // Supprime les dashboards expirés (optionnel)
-  async removeExpiredDashboards(userId, expiredDashboards) {
-    try {
-      const user = await User.findById(userId);
-      const expiredIds = expiredDashboards.map(d => d.dashboard._id.toString());
-      
-      user.dashboards = user.dashboards.filter(
-        d => !expiredIds.includes(d.dashboard.toString())
-      );
-      
-      await user.save();
-      console.log(`Removed ${expiredDashboards.length} expired dashboards for user ${userId}`);
-    } catch (error) {
-      console.error('Error removing expired dashboards:', error);
-    }
-  }
-
-  // Méthode manuelle pour tester les notifications
-  async testNotifications() {
-    console.log('Testing dashboard notifications...');
-    await this.checkExpiringDashboards(7);
-    await this.checkExpiringDashboards(1);
-    await this.checkExpiringDashboardsHours(24);
-    await this.checkExpiredDashboards();
-    console.log('Test completed');
+    console.log(`Notification envoyée pour l'utilisateur ${userId}, type: ${type}`);
   }
 }
 

@@ -5,7 +5,10 @@ const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const User = require('../models/User');
+const trackActivity = require('../middleware/trackActivity');
 
+// Appliquer le suivi à toutes les routes dashboard
+router.use(trackActivity);
 // IMPORTANT: Routes spécifiques doivent être définies AVANT les routes avec paramètres
 
 // Routes publiques (SANS authentification) - doivent être en premier

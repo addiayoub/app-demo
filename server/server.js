@@ -7,18 +7,24 @@ const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
+const http = require('http');
+const socketIo = require('socket.io');
 require('dotenv').config();
 
 // Import du service de nettoyage
 const cleanupService = require('./services/cleanupService');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || '*',
+    methods: ["GET", "POST"]
+  }
+});
 
-const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
-const dashboardRoutes = require('./routes/dashboards');
-const pricingRoutes = require('./routes/pricingRoutes');
-const contactRoutes = require('./routes/contact');
+// Stocker l'instance io dans l'app pour y accéder dans les controllers
+app.set('socketio', io);
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -27,9 +33,11 @@ app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 });
+
 // Augmenter la limite des payloads
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
 const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',') : [''];
 
 app.use(cors({
@@ -41,10 +49,9 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE' , 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 
 app.use(morgan('dev'));
 app.use('/uploads', express.static('uploads'));
@@ -67,7 +74,7 @@ app.use(passport.session());
 
 require('./config/passport');
 
-// Connexion à MongoDB (sans démarrage automatique du nettoyage)
+// Connexion à MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connecté');
@@ -75,18 +82,18 @@ mongoose.connect(process.env.MONGODB_URI)
   })
   .catch(err => console.error('Erreur MongoDB:', err));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/dashboards', dashboardRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/pricing', pricingRoutes);
-app.use('/api', contactRoutes);
-// Après les autres routes
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/dashboards', require('./routes/dashboards'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/pricing', require('./routes/pricingRoutes'));
+app.use('/api', require('./routes/contact'));
+app.use('/api/tickets', require('./routes/ticketRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/admin/tickets', require('./routes/adminTicketRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
-app.get('/', (req, res) => {
-  res.json({ message: 'API en cours d\'exécution!' });
-});
 
-// Route pour obtenir les statistiques du service de nettoyage
+// Routes pour le nettoyage
 app.get('/api/admin/cleanup-stats', (req, res) => {
   const stats = cleanupService.getStats();
   res.json({
@@ -95,7 +102,6 @@ app.get('/api/admin/cleanup-stats', (req, res) => {
   });
 });
 
-// Route pour voir les dashboards expirés sans les supprimer
 app.get('/api/admin/expired-dashboards', async (req, res) => {
   try {
     const expiredInfo = await cleanupService.getExpiredDashboardsCount();
@@ -111,7 +117,6 @@ app.get('/api/admin/expired-dashboards', async (req, res) => {
   }
 });
 
-// Route pour déclencher un nettoyage manuel
 app.post('/api/admin/manual-cleanup', async (req, res) => {
   try {
     const result = await cleanupService.manualCleanup();
@@ -129,10 +134,22 @@ app.post('/api/admin/manual-cleanup', async (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.json({ message: 'API en cours d\'exécution!' });
+});
+
+// Gestion des connexions WebSocket
+io.on('connection', (socket) => {
+  console.log('New client connected');
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, () => {
   console.log(`Serveur lancé sur http://${HOST}:${PORT}`);
 });
