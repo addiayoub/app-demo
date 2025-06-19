@@ -1,6 +1,6 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
-const EmailService = require('../services/EmailService');
+const EmailService = require('../services/emailService');
 const path = require('path');
 const fs = require('fs').promises;
 const mongoose = require('mongoose');

@@ -74,7 +74,37 @@ const AdminTickets = () => {
     };
   }, [socket, selectedTicket]);
 
+const AttachmentPreview = ({ attachment }) => {
+  const attachmentUrl = getAttachmentUrl(attachment.path);
+  const isImage = attachment.mimetype.startsWith('image/');
 
+  return (
+    <div className="border border-gray-200 rounded-lg p-2 bg-white">
+      {isImage ? (
+        <a href={attachmentUrl} target="_blank" rel="noopener noreferrer">
+          <img 
+            src={attachmentUrl} 
+            alt={attachment.originalName} 
+            className="max-w-full h-auto max-h-40 rounded-md object-contain"
+          />
+        </a>
+      ) : (
+        <a 
+          href={attachmentUrl} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center text-blue-600 hover:text-blue-800"
+        >
+          <Paperclip size={14} className="mr-2" />
+          {attachment.originalName}
+        </a>
+      )}
+      <div className="text-xs text-gray-500 mt-1">
+        {Math.round(attachment.size / 1024)} KB
+      </div>
+    </div>
+  );
+};
   // États pour les réponses
   const [replyContent, setReplyContent] = useState('');
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
@@ -232,6 +262,7 @@ const calculateLocalStats = () => {
    const addReplyToTicket = async (ticketId, content) => {
   try {
     setIsSubmittingReply(true);
+    const loadingAlert = showLoadingAlert('Envoi en cours...');
     
     const response = await fetch(`${API_URL}/api/admin/tickets/${ticketId}/reply`, {
       method: 'POST',
@@ -241,6 +272,7 @@ const calculateLocalStats = () => {
     });
 
     if (!response.ok) {
+      loadingAlert.close();
       showErrorAlert('Erreur', 'Échec de l\'envoi de la réponse');
       throw new Error('Erreur lors de l\'envoi');
     }
@@ -251,6 +283,8 @@ const calculateLocalStats = () => {
     setTickets(prev => prev.map(t => t._id === ticketId ? updatedTicket : t));
     setSelectedTicket(updatedTicket);
     
+    loadingAlert.close();
+    showSuccessAlert('Envoyé!', 'Votre réponse a été envoyée avec succès');
     
     return updatedTicket;
   } catch (error) {
